@@ -1266,8 +1266,8 @@ u32 _start(u32 calledByGame)
 	if (shutdown_pressed > 0)
 	{
 		u32 timer = read32(HW_TIMER);
-		// 7594456 == ~4s at 243 MHz / 128 (526.7ns per tick)
-		if (timer - shutdown_timer > 7594456)
+		// 3797228 == ~2s at 243 MHz / 128 (526.7ns per tick)
+		if (timer - shutdown_timer > 3797228)
 			goto Shutdown;
 	}
 	last_shutdown_pressed = shutdown_pressed;
