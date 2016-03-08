@@ -174,10 +174,10 @@ int main(int argc, char **argv)
 	__ES_Close();
 	s32 fd = IOS_Open( "/dev/es", 0 );
 
-	memset( STATUS, 0xFFFFFFFF, 0x20  );
+	memset( STATUS, 0xFF, 0x20  );
 	DCFlushRange( STATUS, 0x20 );
 
-	memset( (void*)0x91000000, 0xFFFFFFFF, 0x20  );
+	memset( (void*)0x91000000, 0xFF, 0x20  );
 	DCFlushRange( (void*)0x91000000, 0x20 );
 
 	*(vu32*)0xD3003420 = 0; //make sure kernel doesnt reload

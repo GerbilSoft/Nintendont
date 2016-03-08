@@ -30,7 +30,7 @@ void HIDUpdateRegisters()
 			f = fopen("sd:/controller.ini", "rb");
 			if(f == NULL)
 			{
-				fopen("sd:/controller.ini.ini", "rb");
+				f = fopen("sd:/controller.ini.ini", "rb");
 				if(f == NULL)
 				{
 					f = fopen("usb:/controller.ini", "rb");

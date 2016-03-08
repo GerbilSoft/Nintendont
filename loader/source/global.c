@@ -382,6 +382,7 @@ int CreateNewFile(char *Path, u32 size)
 	if(buf == NULL)
 	{
 		gprintf("Failed to allocate %i bytes!\r\n", size);
+		fclose(f);	// FIXME: Delete the file?
 		return -3;
 	}
 	memset(buf, 0, size);
