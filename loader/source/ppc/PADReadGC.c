@@ -31,6 +31,26 @@ static u32 PrevAdapterChannel2 = 0;
 static u32 PrevAdapterChannel3 = 0;
 static u32 PrevAdapterChannel4 = 0;
 
+// from ogc/machine/processor.h
+static inline u32 read32(u32 addr)
+{
+	u32 x;
+	asm volatile("lwz %0,0(%1) ; sync" : "=r"(x) : "b"(0xc0000000 | addr));
+	return x;
+}
+
+// HW_TIMER isn't declared here, so we'll declare it ourselves.
+// Copied from kernel/global.h.
+#define HW_REG_BASE	0xcd800000
+#define HW_TIMER	(HW_REG_BASE + 0x010)	//increments around every 526.7 nanoseconds
+
+// Shutdown timer for Wii Remote / Wii U Pro Controller.
+// Other controllers use elaborate key combinations.
+// These controllers simply require pressing the Home button,
+// which is easy to do accidentally.
+static u32 shutdown_timer = 0;		// Last shutdown timer value.
+static u32 last_shutdown_pressed = 0;	// Last shutdown press count.
+
 const s8 DEADZONE = 0x1A;
 #define HID_PAD_NONE	4
 #define HID_PAD_NOT_SET	0xFF
@@ -521,6 +541,12 @@ u32 _start(u32 calledByGame)
 
 	if(MaxPads == 0) //wiiu
 		MaxPads = 4;
+
+	// Shutdown timer for Wii Remote / Wii U Pro Controller.
+	// Other controllers use elaborate key combinations.
+	// These controllers simply require pressing the Home button,
+	// which is easy to do accidentally.
+	u8 shutdown_pressed = 0;
 
 	for(chan = 0; chan < MaxPads; ++chan)	//bluetooth controller loop
 	{
@@ -1153,7 +1179,11 @@ u32 _start(u32 calledByGame)
 			if(BTPad[chan].button & WM_BUTTON_ONE)
 				button |= PAD_BUTTON_START;	
 			if(BTPad[chan].button & WM_BUTTON_HOME)
-				goto Shutdown;
+			{
+				if (shutdown_pressed == 0 && last_shutdown_pressed == 0)
+					shutdown_timer = read32(HW_TIMER);
+				shutdown_pressed++;
+			}
 		}	//end nunchuck configs
 
 		if(BTPad[chan].used & (C_CC | C_CCP))
@@ -1193,8 +1223,12 @@ u32 _start(u32 calledByGame)
 				button |= PAD_BUTTON_UP;
 			
 			if(BTPad[chan].button & BT_BUTTON_HOME)
-				goto Shutdown;
-		}	
+			{
+				if (shutdown_pressed == 0 && last_shutdown_pressed == 0)
+					shutdown_timer = read32(HW_TIMER);
+				shutdown_pressed++;
+			}
+		}
 		
 		Pad[chan].button = button;
 
@@ -1227,6 +1261,16 @@ u32 _start(u32 calledByGame)
 	}
 	memInvalidate = (u32)SIInited;
 	asm volatile("dcbi 0,%0; sync" : : "b"(memInvalidate) : "memory");
+
+	// Check for shutdown requests.
+	if (shutdown_pressed > 0)
+	{
+		u32 timer = read32(HW_TIMER);
+		// 7594456 == ~4s at 243 MHz / 128 (526.7ns per tick)
+		if (timer - shutdown_timer > 7594456)
+			goto Shutdown;
+	}
+	last_shutdown_pressed = shutdown_pressed;
 
 	/* Some games always need the controllers "used" */
 	if(*PADForceConnected)
