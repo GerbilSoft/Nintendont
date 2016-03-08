@@ -56,6 +56,7 @@ DRESULT disk_read_sd (
 	BYTE *buff,		/* Data buffer to store read data */
 	DWORD sector,	/* Sector address in LBA */
 	UINT count		/* Number of sectors to read */
+)
 {
 	s32 Retry=10;
 
@@ -114,6 +115,7 @@ DRESULT disk_read_usb (
 	BYTE *buff,		/* Data buffer to store read data */
 	DWORD sector,	/* Sector address in LBA */
 	UINT count		/* Number of sectors to read */
+)
 {
 	if (ConfigGetConfig(NIN_CFG_LED))
 		set32(HW_GPIO_OUT, GPIO_SLOT_LED);	//turn on drive light
@@ -144,6 +146,7 @@ DRESULT disk_write_usb (
 	const BYTE *buff,	/* Data to be written */
 	DWORD sector,		/* Sector address in LBA */
 	UINT count			/* Number of sectors to write */
+)
 {
 	if(USBStorage_WriteSectors(sector, count, buff) != 1)
 	{
@@ -192,7 +195,7 @@ DWORD get_fattime(void)
 	//	| ((DWORD)tm.tm_min << 5)
 	//	| ((DWORD)tm.tm_sec >> 1);
 	//return ret;
-	
+
 	return 0;
 }
 
