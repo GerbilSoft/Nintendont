@@ -44,7 +44,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 // libcustomfat
 #include <sys/iosupport.h>
-#include <fat.h>
 #include "../../libcustomfat/source/partition.h"
 // Active partition in libcustomfat.
 static const PARTITION* partition = NULL;
@@ -304,21 +303,8 @@ static int SelectGame(void)
 	// this could take a while.
 	ShowLoadingScreen();
 
-	// Get the PARTITION* struct so we can show more detailed information.
-	// FIXME: _FAT_partition_getPartitionFromPath() isn't working.
-	// Process devoptab_list[] manually.
+	// Clear the previous partition.
 	partition = NULL;
-	const char *root_dev = GetRootDevice();
-	int idx;
-	for (idx = 0; devoptab_list[idx] != NULL; idx++)
-	{
-		if (!strcmp(root_dev, devoptab_list[idx]->name))
-		{
-			// Found the device.
-			partition = (const PARTITION*)(devoptab_list[idx]->deviceData);
-			break;
-		}
-	}
 
 	// Load the game list.
 	u32 gamecount = 0;
@@ -350,6 +336,25 @@ static int SelectGame(void)
 		}
 	}
 
+	if (devState != DEV_NO_OPEN)
+	{
+		// Get the PARTITION* struct so we can show more detailed information.
+		// FIXME: _FAT_partition_getPartitionFromPath() isn't working.
+		// Process devoptab_list[] manually.
+		partition = NULL;
+		const char *root_dev = GetRootDevice();
+		int idx;
+		for (idx = 0; devoptab_list[idx] != NULL; idx++)
+		{
+			if (!strcmp(root_dev, devoptab_list[idx]->name))
+			{
+				// Found the device.
+				partition = (const PARTITION*)(devoptab_list[idx]->deviceData);
+				break;
+			}
+		}
+	}
+	
 	bool selected = false;	// Set to TRUE if the user selected a game.
 
 	u32 redraw = 1;
@@ -1075,8 +1080,7 @@ static void PrintDevInfo(void)
 		case DEV_NO_OPEN:
 			PrintFormat(DEFAULT_SIZE, MAROON, MENU_POS_X, MENU_POS_Y + 20*4,
 				"WARNING: %s FAT device could not be opened.", s_devType);
-			// Can't show any more device information...
-			return;
+			break;
 		case DEV_NO_GAMES:
 			PrintFormat(DEFAULT_SIZE, MAROON, MENU_POS_X, MENU_POS_Y + 20*4,
 				"WARNING: %s:/games/ was not found.", GetRootDevice());
@@ -1084,11 +1088,6 @@ static void PrintDevInfo(void)
 		default:
 			break;
 	}
-
-	// If we don't have the libcustomfat PARTITION*,
-	// we can't show any more details.
-	if (!partition)
-		return;
 
 	// Example info lines:
 	// SD: 1 GB, MBR, Partition 1 (FAT16, 0.9 GB)
@@ -1100,6 +1099,7 @@ static void PrintDevInfo(void)
 	// - Check if partition table is MBR or GPT.
 	u32 sectorSize = 0;
 
+	u64 devSize = 0;
 	char s_devSize[16];
 	if (!UseSD)
 	{
@@ -1108,38 +1108,56 @@ static void PrintDevInfo(void)
 		extern u32 __sector_size;
 		extern u32 __sector_count;
 		sectorSize = __sector_size;
-		u64 devSize = (u64)__sector_size * (u64)__sector_count;
+		devSize = (u64)__sector_size * (u64)__sector_count;
 		formatFileSize(s_devSize, sizeof(s_devSize), devSize);
 	}
 	else
 	{
 		// TODO: SD device size.
+		devSize = 1;
 		strcpy(s_devSize, "??? GB");
 	}
 
-	// Partition size.
-	// NOTE: partition->totalSize excludes reserved sectors.
-	// We want to show the total size of the partition.
-	char s_partSize[16];
-	u64 partSize = (uint64_t)partition->numberOfSectors * (uint64_t)partition->bytesPerSector;
-	formatFileSize(s_partSize, sizeof(s_partSize), partSize);
-
-	// Filesystem type.
-	static const char *fsTypes[4] = {"Unknown", "FAT12", "FAT16", "FAT32"};
-	const char *s_fsType = fsTypes[partition->filesysType & 3];
-
-	// Sector size.
-	// If we couldn't get it from the device,
-	// get it from the filesystem.
-	if (sectorSize == 0)
+	if (devSize == 0)
 	{
-		sectorSize = partition->bytesPerSector;
+		// No device detected.
+		return;
 	}
 
-	PrintFormat(DEFAULT_SIZE, BLACK, MENU_POS_X, MENU_POS_Y + 20*3,
-		"%s: %s, %s, %db, Part#%d (%s, %s)",
-		s_devType, s_devSize, "MBR?",
-		sectorSize, -1, s_fsType, s_partSize);
+	if (partition)
+	{
+		// Partition size.
+		// NOTE: partition->totalSize excludes reserved sectors.
+		// We want to show the total size of the partition.
+		char s_partSize[16];
+		u64 partSize = (uint64_t)partition->numberOfSectors * (uint64_t)partition->bytesPerSector;
+		formatFileSize(s_partSize, sizeof(s_partSize), partSize);
+
+		// Filesystem type.
+		static const char *fsTypes[4] = {"Unknown", "FAT12", "FAT16", "FAT32"};
+		const char *s_fsType = fsTypes[partition->filesysType & 3];
+
+		// Sector size.
+		// If we couldn't get it from the device,
+		// get it from the filesystem.
+		if (sectorSize == 0)
+		{
+			sectorSize = partition->bytesPerSector;
+		}
+
+		PrintFormat(DEFAULT_SIZE, BLACK, MENU_POS_X, MENU_POS_Y + 20*3,
+			"%s: %s, %s, %db, Part#%d (%s, %s)",
+			s_devType, s_devSize, "MBR?",
+			sectorSize, -1, s_fsType, s_partSize);
+	}
+	else
+	{
+		// No partition information available.
+		// Show only physical device information.
+		PrintFormat(DEFAULT_SIZE, BLACK, MENU_POS_X, MENU_POS_Y + 20*3,
+			"%s: %s, %s, %db",
+			s_devType, s_devSize, "MBR?", sectorSize);
+	}
 }
 
 void ReconfigVideo(GXRModeObj *vidmode)
