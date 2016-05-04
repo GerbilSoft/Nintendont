@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------*/
-/* Low level disk I/O module skeleton for FatFs     (C)ChaN, 2014        */
+/* Low level disk I/O module skeleton for FatFs     (C)ChaN, 2016        */
 /*-----------------------------------------------------------------------*/
 /* If a working storage control module is available, it should be        */
 /* attached to the FatFs via a glue function rather than modifying it.   */
@@ -89,7 +89,6 @@ DRESULT disk_read_sd (
 /* Write Sector(s) [SD card]                                             */
 /*-----------------------------------------------------------------------*/
 
-#if _USE_WRITE
 DRESULT disk_write_sd (
 	BYTE pdrv,			/* Physical drive nmuber to identify the drive */
 	const BYTE *buff,	/* Data to be written */
@@ -102,7 +101,6 @@ DRESULT disk_write_sd (
 
 	return RES_OK;
 }
-#endif
 
 
 
@@ -140,7 +138,6 @@ DRESULT disk_read_usb (
 /* Write Sector(s) [USB storage]                                         */
 /*-----------------------------------------------------------------------*/
 
-#if _USE_WRITE
 DRESULT disk_write_usb (
 	BYTE pdrv,			/* Physical drive nmuber to identify the drive */
 	const BYTE *buff,	/* Data to be written */
@@ -156,14 +153,12 @@ DRESULT disk_write_usb (
 
 	return RES_OK;
 }
-#endif
 
 
 /*-----------------------------------------------------------------------*/
 /* Miscellaneous Functions                                               */
 /*-----------------------------------------------------------------------*/
 
-#if _USE_IOCTL
 DRESULT disk_ioctl (
 	BYTE pdrv,		/* Physical drive nmuber (0..) */
 	BYTE cmd,		/* Control code */
@@ -175,7 +170,6 @@ DRESULT disk_ioctl (
 
 	return RES_OK;
 }
-#endif
 
 
 
