@@ -135,7 +135,7 @@
 /  This option has no effect when _LFN_UNICODE == 0. */
 
 
-#define _FS_RPATH	0
+#define _FS_RPATH	1
 /* This option configures support of relative path.
 /
 /   0: Disable relative path and remove related functions.
@@ -148,12 +148,12 @@
 / Drive/Volume Configurations
 /---------------------------------------------------------------------------*/
 
-#define _VOLUMES	1
+#define _VOLUMES	2
 /* Number of volumes (logical drives) to be used. */
 
 
 #define _STR_VOLUME_ID	0
-#define _VOLUME_STRS	"RAM","NAND","CF","SD1","SD2","USB1","USB2","USB3"
+#define _VOLUME_STRS	"SD","USB"
 /* _STR_VOLUME_ID switches string support of volume ID.
 /  When _STR_VOLUME_ID is set to 1, also pre-defined strings can be used as drive
 /  number in the path name. _VOLUME_STRS defines the drive ID strings for each

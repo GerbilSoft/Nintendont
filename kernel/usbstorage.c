@@ -33,6 +33,9 @@ distribution.
 #include "usbstorage.h"
 #include "usb.h"
 
+// diskio's USB device information is set here.
+#include "diskio.h"
+
 #define ROUNDDOWN32(v)				(((u32)(v)-0x1f)&~0x1f)
 
 #define	HEAP_SIZE					(18*1024)
@@ -80,8 +83,6 @@ distribution.
 #define MAX_TRANSFER_SIZE_V5		(16*1024)
 
 #define DEVLIST_MAXSIZE				8
-
-extern u32 s_size, s_cnt;
 
 static bool __inited = false;
 static bool __mounted = false;
@@ -240,8 +241,8 @@ void USBStorage_Open()
 	sync_before_read((void*)0x132C1000, sizeof(important_storage_data));
 	important_storage_data *d = (important_storage_data*)0x132C1000;
 
-	s_size = d->sector_size;
-	s_cnt = d->sector_count;
+	FF_dev_info[FF_DEV_USB].s_size = d->sector_size;
+	FF_dev_info[FF_DEV_USB].s_cnt = d->sector_count;
 
 	__lun = d->lun;
 	__vid = d->vid;
@@ -295,7 +296,8 @@ bool USBStorage_ReadSectors(u32 sector, u32 numSectors, void *buffer)
 		0
 	};
 
-	retval = __cycle(__lun, buffer, numSectors * s_size, cmd, sizeof(cmd), 0, &status, NULL);
+	// FIXME: Use internal s_size value instead of FF_dev_info.
+	retval = __cycle(__lun, buffer, numSectors * FF_dev_info[FF_DEV_USB].s_size, cmd, sizeof(cmd), 0, &status, NULL);
 	if(retval > 0 && status != 0)
 		retval = USBSTORAGE_ESTATUS;
 
@@ -322,7 +324,8 @@ bool USBStorage_WriteSectors(u32 sector, u32 numSectors, const void *buffer)
 		0
 	};
 
-	retval = __cycle(__lun, (u8*)buffer, numSectors * s_size, cmd, sizeof(cmd), 1, &status, NULL);
+	// FIXME: Use internal s_size value instead of FF_dev_info.
+	retval = __cycle(__lun, (u8*)buffer, numSectors * FF_dev_info[FF_DEV_USB].s_size, cmd, sizeof(cmd), 1, &status, NULL);
 	if(retval > 0 && status != 0)
 		retval = USBSTORAGE_ESTATUS;
 

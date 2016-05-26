@@ -41,12 +41,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //#undef DEBUG
 bool access_led = false;
 u32 USBReadTimer = 0;
-extern u32 s_size;
-extern u32 s_cnt;
 
 static FATFS *fatfs = NULL;
-//this is just a single / as u16, easier to write in hex
-static const WCHAR fatDevName[2] = { 0x002F, 0x0000 };
+
+// FAT device names.
+// 0: = SD card
+// 1: = USB device
+static const WCHAR fatDevNames[_VOLUMES][3] = {{'0', ':', 0}, {'1', ':', 0}};
 
 extern u32 SI_IRQ;
 extern bool DI_IRQ, EXI_IRQ;
@@ -109,21 +110,9 @@ int _main( int argc, char *argv[] )
 	}
 	ConfigSyncBeforeRead();
 
-	u32 UseUSB = ConfigGetConfig(NIN_CFG_USB);
-	SetDiskFunctions(UseUSB);
-
-	BootStatus(2, 0, 0);
-	if(UseUSB)
-	{
-		ret = USBStorage_Startup();
-		dbgprintf("USB:Drive size: %dMB SectorSize:%d\r\n", s_cnt / 1024 * s_size / 1024, s_size);
-	}
-	else
-	{
-		s_size = PAGE_SIZE512; //manually set s_size
-		ret = SDHCInit();
-	}
-	if(ret != 1)
+	// "0:" for SD, "1:" for USB.
+	const u32 UseUSB = ConfigGetConfig(NIN_CFG_USB);
+	if (disk_initialize(UseUSB) != RES_OK)
 	{
 		dbgprintf("Device Init failed:%d\r\n", ret );
 		BootStatusError(-2, ret);
@@ -138,7 +127,8 @@ int _main( int argc, char *argv[] )
 	BootStatus(3, 0, 0);
 	fatfs = (FATFS*)malloca( sizeof(FATFS), 32 );
 
-	s32 res = f_mount( fatfs, fatDevName, 1 );
+	// Attempt to mount the device in FatFS.
+	s32 res = f_mount( fatfs, fatDevNames[UseUSB], 1 );
 	if( res != FR_OK )
 	{
 		dbgprintf("ES:f_mount() failed:%d\r\n", res );
@@ -149,8 +139,20 @@ int _main( int argc, char *argv[] )
 	
 	BootStatus(4, 0, 0);
 
+	// Set the selected device as the current drive so we
+	// don't have to prepend the drive name to every f_open().
+	res = f_chdrive( fatDevNames[UseUSB] );
+	if (res != FR_OK )
+	{
+		dbgprintf("ES:f_chdrive() failed:%d\r\n", res );
+		BootStatusError(-4, res);
+		mdelay(4000);
+		Shutdown();
+	}
+
 	BootStatus(5, 0, 0);
 
+	// Try to open a file to make sure FatFS is working.
 	FIL fp;
 	s32 fres = f_open_char(&fp, "/bladie", FA_READ|FA_OPEN_EXISTING);
 	switch(fres)
@@ -171,19 +173,23 @@ int _main( int argc, char *argv[] )
 		} break;
 	}
 
-	if(!UseUSB) //Use FAT values for SD
-		s_cnt = fatfs->n_fatent * fatfs->csize;
+	if (!UseUSB) {
+		// Use FAT values for SD.
+		// TODO: Retrieve the CSD and use those values instead.
+		// TODO: Move to disk_initialize().
+		FF_dev_info[UseUSB].s_cnt = fatfs->n_fatent * fatfs->csize;
+	}
 
-	BootStatus(6, s_size, s_cnt);
+	BootStatus(6, FF_dev_info[UseUSB].s_size, FF_dev_info[UseUSB].s_cnt);
 
-	BootStatus(7, s_size, s_cnt);
+	BootStatus(7, FF_dev_info[UseUSB].s_size, FF_dev_info[UseUSB].s_cnt);
 	ConfigInit();
 
 	if (ConfigGetConfig(NIN_CFG_LOG))
 		SDisInit = 1;  // Looks okay after threading fix
 	dbgprintf("Game path: %s\r\n", ConfigGetGamePath());
 
-	BootStatus(8, s_size, s_cnt);
+	BootStatus(8, FF_dev_info[UseUSB].s_size, FF_dev_info[UseUSB].s_cnt);
 
 	memset32((void*)RESET_STATUS, 0, 0x20);
 	sync_after_write((void*)RESET_STATUS, 0x20);
@@ -196,7 +202,7 @@ int _main( int argc, char *argv[] )
 	memset32((void*)0x13026500, 0, 0x100);
 	sync_after_write((void*)0x13026500, 0x100);
 
-	BootStatus(9, s_size, s_cnt);
+	BootStatus(9, FF_dev_info[UseUSB].s_size, FF_dev_info[UseUSB].s_cnt);
 
 	DIRegister();
 	DI_Thread = thread_create(DIReadThread, NULL, ((u32*)&__di_stack_addr), ((u32)(&__di_stack_size)) / sizeof(u32), 0x78, 1);
@@ -204,13 +210,13 @@ int _main( int argc, char *argv[] )
 
 	DIinit(true);
 
-	BootStatus(10, s_size, s_cnt);
+	BootStatus(10, FF_dev_info[UseUSB].s_size, FF_dev_info[UseUSB].s_cnt);
 
 	GCAMInit();
 
 	EXIInit();
 
-	BootStatus(11, s_size, s_cnt);
+	BootStatus(11, FF_dev_info[UseUSB].s_size, FF_dev_info[UseUSB].s_cnt);
 
 	SIInit();
 	StreamInit();
@@ -219,7 +225,7 @@ int _main( int argc, char *argv[] )
 //Tell PPC side we are ready!
 	cc_ahbMemFlush(1);
 	mdelay(1000);
-	BootStatus(0xdeadbeef, s_size, s_cnt);
+	BootStatus(0xdeadbeef, FF_dev_info[UseUSB].s_size, FF_dev_info[UseUSB].s_cnt);
 	mdelay(1000); //wait before hw flag changes
 	dbgprintf("Kernel Start\r\n");
 
@@ -494,9 +500,9 @@ int _main( int argc, char *argv[] )
 #endif
 
 //unmount FAT device
+	f_mount(NULL, fatDevNames[UseUSB], 1);
 	free(fatfs);
 	fatfs = NULL;
-	f_mount(NULL, fatDevName, 1);
 
 	if(UseUSB)
 		USBStorage_Shutdown();

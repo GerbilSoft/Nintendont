@@ -44,9 +44,9 @@ $(TARGET): kernel.ld $(OBJECTS)
 	@echo  "AS	$@"
 	@$(CC) $(CFLAGS) $(CPPFLAGS) -D_LANGUAGE_ASSEMBLY -c -MMD -MP -MF $(@:.o=.d) -x assembler-with-cpp -o $@ $<
 
-%.o : %.c
+%.o: %.c
 	@echo  "CC	$@"
 	@$(CC) $(CFLAGS) $(CPPFLAGS) -c -MMD -MP -MF $(@:.o=.d) -o $@ $<
 
 clean:
-	-rm -f *.elf *.o *.bin *.d *.map lwbt/*.d lwbt/*.o option/*.d option/*.o
+	-rm -f *.elf *.o *.bin *.d *.map lwbt/*.d lwbt/*.o

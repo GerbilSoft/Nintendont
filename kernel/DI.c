@@ -35,8 +35,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "HID.h"
 #include "BT.h"
 #include "usbstorage.h"
+#include "diskio.h"
 static u8 DummyBuffer[0x1000] __attribute__((aligned(32)));
-extern u32 s_cnt;
 
 #ifndef DEBUG_DI
 #define dbgprintf(...)
@@ -774,7 +774,8 @@ u32 DIReadThread(void *arg)
 			case IOS_IOCTL:
 				if(di_msg->ioctl.command == 2)
 				{
-					USBStorage_ReadSectors(read32(HW_TIMER) % s_cnt, 1, DummyBuffer);
+					// FIXME: Only do this if using USB storage?
+					USBStorage_ReadSectors(read32(HW_TIMER) % FF_dev_info[FF_DEV_USB].s_cnt, 1, DummyBuffer);
 					mqueue_ack( di_msg, 0 );
 					break;
 				}

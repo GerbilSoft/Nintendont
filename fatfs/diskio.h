@@ -31,22 +31,19 @@ typedef enum {
 
 DSTATUS disk_initialize (BYTE pdrv);
 DSTATUS disk_status (BYTE pdrv);
+DRESULT disk_read (BYTE pdrv, BYTE* buff, DWORD sector, UINT count);
+DRESULT disk_write (BYTE pdrv, const BYTE* buff, DWORD sector, UINT count);
 DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void* buff);
 
-/* Nintendont: R/W functions are pointers in order to *
- * allow support for both SD cards and USB storage.   *
- * NOTE: This *could* be implemented by using the     *
- * "Physical Drive Number" (pdrv) parameter.          */
-typedef DRESULT (*DiskReadFunc)(BYTE pdrv, BYTE* buff, DWORD sector, UINT count);
-typedef DRESULT (*DiskWriteFunc)(BYTE pdrv, const BYTE* buff, DWORD sector, UINT count);
-extern DiskReadFunc disk_read;
-extern DiskWriteFunc disk_write;
+/* Nintendont: Device information. */
+#define FF_DEV_SD	0
+#define FF_DEV_USB	1
 
-/**
- * Nintendont: Initialize disk drive functions.
- * @param usb 1 for USB; 0 for SD.
- */
-void SetDiskFunctions(DWORD usb);
+typedef struct _FF_dev_info_t {
+	DWORD s_size;	// Sector size.
+	DWORD s_cnt;	// Sector count.
+} FF_dev_info_t;
+extern FF_dev_info_t FF_dev_info[/*_VOLUMES*/];
 
 /* Disk Status Bits (DSTATUS) */
 
