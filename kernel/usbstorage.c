@@ -33,9 +33,6 @@ distribution.
 #include "usbstorage.h"
 #include "usb.h"
 
-// diskio's USB device information is set here.
-#include "diskio.h"
-
 #define ROUNDDOWN32(v)				(((u32)(v)-0x1f)&~0x1f)
 
 #define	HEAP_SIZE					(18*1024)
@@ -87,6 +84,8 @@ distribution.
 static bool __inited = false;
 static bool __mounted = false;
 
+static u32 __sector_size = 0;
+static u32 __sector_count = 0;
 static u8 __lun = 0;
 static u8 __ep_in = 0;
 static u8 __ep_out = 0;
@@ -241,8 +240,8 @@ void USBStorage_Open()
 	sync_before_read((void*)0x132C1000, sizeof(important_storage_data));
 	important_storage_data *d = (important_storage_data*)0x132C1000;
 
-	FF_dev_info[FF_DEV_USB].s_size = d->sector_size;
-	FF_dev_info[FF_DEV_USB].s_cnt = d->sector_count;
+	__sector_size = d->sector_size;
+	__sector_count = d->sector_count;
 
 	__lun = d->lun;
 	__vid = d->vid;
@@ -296,8 +295,7 @@ bool USBStorage_ReadSectors(u32 sector, u32 numSectors, void *buffer)
 		0
 	};
 
-	// FIXME: Use internal s_size value instead of FF_dev_info.
-	retval = __cycle(__lun, buffer, numSectors * FF_dev_info[FF_DEV_USB].s_size, cmd, sizeof(cmd), 0, &status, NULL);
+	retval = __cycle(__lun, buffer, numSectors * __sector_size, cmd, sizeof(cmd), 0, &status, NULL);
 	if(retval > 0 && status != 0)
 		retval = USBSTORAGE_ESTATUS;
 
@@ -324,8 +322,7 @@ bool USBStorage_WriteSectors(u32 sector, u32 numSectors, const void *buffer)
 		0
 	};
 
-	// FIXME: Use internal s_size value instead of FF_dev_info.
-	retval = __cycle(__lun, (u8*)buffer, numSectors * FF_dev_info[FF_DEV_USB].s_size, cmd, sizeof(cmd), 1, &status, NULL);
+	retval = __cycle(__lun, (u8*)buffer, numSectors * __sector_count, cmd, sizeof(cmd), 1, &status, NULL);
 	if(retval > 0 && status != 0)
 		retval = USBSTORAGE_ESTATUS;
 
@@ -363,4 +360,22 @@ void USBStorage_Shutdown(void)
 		cbw_buffer = NULL;
 	}
 	__inited = false;
+}
+
+/**
+ * Get USB mass storage sector information.
+ * @param s_size [out] Sector size.
+ * @param s_cnt  [out] Sector count.
+ * @return 0 on success; non-zero on error.
+ */
+int USBStorage_GetSectorInfo(u32 *s_size, u32 *s_cnt)
+{
+	if (!__mounted)
+		return -1;
+
+	if (s_size)
+		*s_size = __sector_size;
+	if (s_cnt)
+		*s_cnt = __sector_count;
+	return 0;
 }

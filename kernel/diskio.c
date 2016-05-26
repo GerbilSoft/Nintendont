@@ -72,8 +72,16 @@ DSTATUS disk_initialize (
 
 		case FF_DEV_USB:
 			if (USBStorage_Startup()) {
-				// USBStorage initializes FF_dev_info[FF_DEV_USB].
-				ret = RES_OK;
+				// Get the sector information.
+				ret = USBStorage_GetSectorInfo(&FF_dev_info[pdrv].s_size, &FF_dev_info[pdrv].s_cnt);
+				if (ret != 0) {
+					// Error retrieving sector information.
+					FF_dev_info[pdrv].s_size = 0;
+					FF_dev_info[pdrv].s_cnt = 0;
+				} else {
+					// Sector information retrieved.
+					ret = RES_OK;
+				}
 			} else {
 				// Error initializing USB.
 				FF_dev_info[pdrv].s_size = 0;

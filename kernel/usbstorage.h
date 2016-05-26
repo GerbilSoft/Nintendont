@@ -1,6 +1,10 @@
 #ifndef __USBSTORAGE_H__
 #define __USBSTORAGE_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define	USBSTORAGE_OK			0
 #define	USBSTORAGE_ENOINTERFACE		-10000
 #define	USBSTORAGE_ESENSE		-10001
@@ -30,5 +34,17 @@ bool USBStorage_Startup(void);
 bool USBStorage_ReadSectors(u32 sector, u32 numSectors, void *buffer);
 bool USBStorage_WriteSectors(u32 sector, u32 numSectors, const void *buffer);
 void USBStorage_Shutdown(void);
+
+/**
+ * Get USB mass storage sector information.
+ * @param s_size [out] Sector size.
+ * @param s_cnt  [out] Sector count.
+ * @return 0 on success; non-zero on error.
+ */
+int USBStorage_GetSectorInfo(u32 *s_size, u32 *s_cnt);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __USBSTORAGE_H__ */
