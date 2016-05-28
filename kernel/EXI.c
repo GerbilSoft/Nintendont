@@ -106,8 +106,8 @@ static inline u32 isCardEnabled(int slot)
 	if (slot < 0 || slot > 2)
 		return 0;
 
-	// Card is enabled if its filename is valid.
-	return (memCard[slot].filename[0] != 0);
+	// Card is enabled if it's larger than 0 bytes.
+	return (memCard[slot].size > 0);
 }
 
 extern vu32 TRIGame;
@@ -415,6 +415,15 @@ void EXIInterrupt(void)
 }
 
 /**
+ * Get the total size of the loaded memory cards.
+ * @return Total size, in bytes.
+ */
+u32 EXIGetTotalCardSize(void)
+{
+	return (memCard[0].size + memCard[1].size);
+}
+
+/**
  * Check if the memory cards have changed.
  * @return True if either memory card has changed; false if not.
  */
@@ -718,7 +727,7 @@ static void EXIDeviceMemoryCard(int slot, u8 *Data, u32 Length, u32 Mode)
 	}
 }
 
-u32 EXIDevice_ROM_RTC_SRAM_UART( u8 *Data, u32 Length, u32 Mode )
+static u32 EXIDevice_ROM_RTC_SRAM_UART(u8 *Data, u32 Length, u32 Mode)
 {
 	if( Mode == 1 )		// Write
 	{
