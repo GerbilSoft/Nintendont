@@ -42,8 +42,9 @@ typedef struct __attribute__ ((packed)) _card_header
 /* Same Method as SRAM Checksum in Kernel */
 static void doChecksum(const u16 *buffer, u32 size, u16 *c1, u16 *c2)
 {
+	u32 i;
 	*c1 = 0; *c2 = 0;
-	for (u32 i = size/sizeof(u16); i > 0; i--, buffer++)
+	for (i = size/sizeof(u16); i > 0; i--, buffer++)
 	{
 		*c1 += *buffer;
 		*c2 += *buffer ^ 0xFFFF;
