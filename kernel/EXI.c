@@ -280,6 +280,13 @@ static int EXILoadCard(int slot)
 
 	// Synchronize the memory card data.
 	sync_after_write(ctx->base, ctx->size);
+
+	if (slot == 1)
+	{
+		// Slot B card image loaded successfully.
+		ncfg->Config |= NIN_CFG_MC_SLOTB;
+	}
+
 	return 0;
 }
 
@@ -297,6 +304,10 @@ void EXIInit(void)
 	// Initialize SRAM.
 	SRAM_Init();
 
+	// Clear the "Slot B" configuration bit initially.
+	ncfg->Config &= ~NIN_CFG_MC_SLOTB;
+
+	// If memory card emulation is enabled, load the card images.
 	if (ConfigGetConfig(NIN_CFG_MEMCARDEMU))
 	{
 		// Load Slot A.
