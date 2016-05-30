@@ -34,6 +34,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define EXI_IRQ_DEFAULT		1900	// about 1000 times a second
 #define EXI_IRQ_SLOW		3800	// about 500 times a second
 
+// FIXME: Moved to config.h after inlining.
+static NIN_CFG *const ncfg = (NIN_CFG*)0x13002900;
+
 static u32 CurrentTiming = EXI_IRQ_DEFAULT;
 
 extern u8 SRAM[64];
@@ -277,6 +280,13 @@ static int EXILoadCard(int slot)
 
 	// Synchronize the memory card data.
 	sync_after_write(ctx->base, ctx->size);
+
+	if (slot == 1)
+	{
+		// Slot B card image loaded successfully.
+		ncfg->Config |= NIN_CFG_MC_SLOTB;
+	}
+
 	return 0;
 }
 
@@ -287,6 +297,10 @@ void EXIInit(void)
 	memset32((void*)EXI_BASE, 0, 0x20);
 	sync_after_write((void*)EXI_BASE, 0x20);
 
+	// Clear the "Slot B" configuration bit initially.
+	ncfg->Config &= ~NIN_CFG_MC_SLOTB;
+
+	// If memory card emulation is enabled, load the card images.
 	if (ConfigGetConfig(NIN_CFG_MEMCARDEMU))
 	{
 		// Load Slot A.
