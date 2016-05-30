@@ -28,7 +28,7 @@ typedef struct NIN_CFG
 
 enum ninconfigbitpos
 {
-	NIN_CFG_BIT_CHEATS		= (0),
+	NIN_CFG_BIT_CHEATS	= (0),
 	NIN_CFG_BIT_DEBUGGER	= (1),	// Only for Wii Version
 	NIN_CFG_BIT_DEBUGWAIT	= (2),	// Only for Wii Version
 	NIN_CFG_BIT_MEMCARDEMU	= (3),
@@ -36,17 +36,20 @@ enum ninconfigbitpos
 	NIN_CFG_BIT_FORCE_WIDE	= (5),
 	NIN_CFG_BIT_FORCE_PROG	= (6),
 	NIN_CFG_BIT_AUTO_BOOT	= (7),
-	NIN_CFG_BIT_HID			= (8),	// Old Versions
+	NIN_CFG_BIT_HID		= (8),	// Old Versions
 	NIN_CFG_BIT_REMLIMIT	= (8),	// New Versions
 	NIN_CFG_BIT_OSREPORT	= (9),
-	NIN_CFG_BIT_USB			= (10),
-	NIN_CFG_BIT_LED			= (11),
-	NIN_CFG_BIT_LOG			= (12),
-	NIN_CFG_BIT_LAST		= (13),
+	NIN_CFG_BIT_USB		= (10),
+	NIN_CFG_BIT_LED		= (11),
+	NIN_CFG_BIT_LOG		= (12),
+	NIN_CFG_BIT_LAST	= (13),
 
 	NIN_CFG_BIT_MC_MULTI	= (13),
 	NIN_CFG_BIT_NATIVE_SI	= (14),
 	NIN_CFG_BIT_WIIU_WIDE	= (15),
+
+	// Internal kernel settings.
+	NIN_CFG_BIT_MC_SLOTB	= (16),	// Slot B image is loaded
 };
 
 enum ninconfig
@@ -59,15 +62,16 @@ enum ninconfig
 	NIN_CFG_FORCE_WIDE	= (1<<NIN_CFG_BIT_FORCE_WIDE),
 	NIN_CFG_FORCE_PROG	= (1<<NIN_CFG_BIT_FORCE_PROG),
 	NIN_CFG_AUTO_BOOT	= (1<<NIN_CFG_BIT_AUTO_BOOT),
-	NIN_CFG_HID			= (1<<NIN_CFG_BIT_HID),
+	NIN_CFG_HID		= (1<<NIN_CFG_BIT_HID),
 	NIN_CFG_REMLIMIT	= (1<<NIN_CFG_BIT_REMLIMIT),
 	NIN_CFG_OSREPORT	= (1<<NIN_CFG_BIT_OSREPORT),
-	NIN_CFG_USB			= (1<<NIN_CFG_BIT_USB),
-	NIN_CFG_LED			= (1<<NIN_CFG_BIT_LED),
-	NIN_CFG_LOG			= (1<<NIN_CFG_BIT_LOG),
+	NIN_CFG_USB		= (1<<NIN_CFG_BIT_USB),
+	NIN_CFG_LED		= (1<<NIN_CFG_BIT_LED),
+	NIN_CFG_LOG		= (1<<NIN_CFG_BIT_LOG),
 	NIN_CFG_MC_MULTI	= (1<<NIN_CFG_BIT_MC_MULTI),
 	NIN_CFG_NATIVE_SI	= (1<<NIN_CFG_BIT_NATIVE_SI),
 	NIN_CFG_WIIU_WIDE	= (1<<NIN_CFG_BIT_WIIU_WIDE),
+	NIN_CFG_MC_SLOTB	= (1<<NIN_CFG_BIT_MC_SLOTB),
 };
 
 enum ninextrasettings
