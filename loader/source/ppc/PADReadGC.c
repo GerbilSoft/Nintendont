@@ -172,7 +172,7 @@ u32 _start(u32 calledByGame)
 		{
 			goto Shutdown;
 		}
-		if((Pad[chan].button&0x1030) == 0x1030)	//reset by pressing start, Z, R
+		else if((Pad[chan].button&0x1030) == 0x1030)	//reset by pressing start, Z, R
 		{
 			/* reset status 3 */
 			*RESET_STATUS = 0x3DEA;
@@ -356,7 +356,12 @@ u32 _start(u32 calledByGame)
 			button |= PAD_BUTTON_START;
 		Pad[chan].button = button;
 
-		if((Pad[chan].button&0x1030) == 0x1030)	//reset by pressing start, Z, R
+		//shutdown by pressing B,Z,R,PAD_BUTTON_DOWN 
+		if((Pad[chan].button&0x234) == 0x234)
+		{
+			goto Shutdown;
+		}
+		else if((Pad[chan].button&0x1030) == 0x1030)	//reset by pressing start, Z, R
 		{
 			/* reset status 3 */
 			*RESET_STATUS = 0x3DEA;
@@ -1218,7 +1223,7 @@ u32 _start(u32 calledByGame)
 		{
 			goto Shutdown;
 		}
-		if((Pad[chan].button&0x1030) == 0x1030)	//reset by pressing start, Z, R
+		else if((Pad[chan].button&0x1030) == 0x1030)	//reset by pressing start, Z, R
 		{
 			/* reset status 3 */
 			*RESET_STATUS = 0x3DEA;
