@@ -222,8 +222,9 @@ u32 _start(u32 calledByGame)
 				asm volatile("dcbi 0,%0; sync" : : "b"(memInvalidate) : "memory");
 				HIDMemPrep = memInvalidate;
 			}
-			if ((HID_CTRL->VID == 0x057E) && (HID_CTRL->PID == 0x0337))	//Nintendo WiiU Gamecube Adapter
+			if (HID_CTRL->QuirkType == HID_QUIRK_WIIU_GCN_ADAPTER)
 			{
+				// Nintendo WiiU GameCube Adapter
 				// 0x04=port powered 0x10=normal controller 0x22=wavebird communicating
 				if (((HID_Packet[1] & 0x10) == 0)	//normal controller not connected
 				 && ((HID_Packet[1] & 0x22) != 0x22))	//wavebird not connected
@@ -314,8 +315,9 @@ u32 _start(u32 calledByGame)
 		}
 		else if( HID_CTRL->DigitalLR == 2)	//no digital trigger buttons compute from analog trigger values
 		{
-			if ((HID_CTRL->VID == 0x0925) && (HID_CTRL->PID == 0x03E8))	//Mayflash Classic Controller Pro Adapter
+			if (HID_CTRL->QuirkType == HID_QUIRK_MAYFLASH_CCPRO_ADAPTER)
 			{
+				// Mayflash Classic Controller Pro Adapter
 				if((HID_Packet[HID_CTRL->L.Offset] & 0x7C) >= HID_CTRL->L.Mask)	//only some bits are part of this control
 					button |= PAD_TRIGGER_L;
 				if((HID_Packet[HID_CTRL->R.Offset] & 0x0F) >= HID_CTRL->R.Mask)	//only some bits are part of this control
@@ -376,80 +378,85 @@ u32 _start(u32 calledByGame)
 			stickX = stickY = substickX = substickY = 0;	//DK Jungle Beat requires all sticks = 0 in menues
 		}
 		else
-		if ((HID_CTRL->VID == 0x044F) && (HID_CTRL->PID == 0xB303))	//Logitech Thrustmaster Firestorm Dual Analog 2
 		{
-			stickX		= HID_Packet[HID_CTRL->StickX.Offset];			//raw 80 81...FF 00 ... 7E 7F (left...center...right)
-			stickY		= -1 - HID_Packet[HID_CTRL->StickY.Offset];		//raw 80 81...FF 00 ... 7E 7F (up...center...down)
-			substickX	= HID_Packet[HID_CTRL->CStickX.Offset];			//raw 80 81...FF 00 ... 7E 7F (left...center...right)
-			substickY	= 127 - HID_Packet[HID_CTRL->CStickY.Offset];	//raw 00 01...7F 80 ... FE FF (up...center...down)
+			switch (HID_CTRL->QuirkType)
+			{
+				case HID_QUIRK_LOGITECH_THRUSTMASTER_FIRESTORM_DUAL_ANALOG_2:
+					// Logitech Thrustmaster Firestorm Dual Analog 2
+					stickX		= HID_Packet[HID_CTRL->StickX.Offset];		//raw 80 81...FF 00 ... 7E 7F (left...center...right)
+					stickY		= -1 - HID_Packet[HID_CTRL->StickY.Offset];	//raw 80 81...FF 00 ... 7E 7F (up...center...down)
+					substickX	= HID_Packet[HID_CTRL->CStickX.Offset];		//raw 80 81...FF 00 ... 7E 7F (left...center...right)
+					substickY	= 127 - HID_Packet[HID_CTRL->CStickY.Offset];	//raw 00 01...7F 80 ... FE FF (up...center...down)
+					break;
+
+				case HID_QUIRK_MAYFLASH_3_IN_1_MAGIC_JOY_BOX:
+					// Mayflash 3 in 1 Magic Joy Box
+					stickX		= HID_Packet[HID_CTRL->StickX.Offset] - 128;	//raw 1A 1B...80 81 ... E4 E5 (left...center...right)
+					stickY		= 127 - HID_Packet[HID_CTRL->StickY.Offset];	//raw 0E 0F...7E 7F ... E4 E5 (up...center...down)
+					if (HID_Packet[HID_CTRL->CStickX.Offset] >= 0)
+						substickX	= (HID_Packet[HID_CTRL->CStickX.Offset] * 2) - 128;	//raw 90 91 10 11...41 42...68 69 EA EB (left...center...right) the 90 91 EA EB are hard right and left almost to the point of breaking
+					else if (HID_Packet[HID_CTRL->CStickX.Offset] < 0xD0)
+						substickX	= 0xFE;
+					else
+						substickX	= 0;
+					substickY	= 127 - ((HID_Packet[HID_CTRL->CStickY.Offset] - 128) * 4);	//raw 88 89...9E 9F A0 A1 ... BA BB (up...center...down)
+					break;
+
+				case HID_QUIRK_MS_SIDEWINDER_FF_2_JOYSTICK:
+					stickX		= ((HID_Packet[HID_CTRL->StickX.Offset] & 0xFC) >> 2) | ((HID_Packet[2] & 0x03) << 6);		//raw 80 81...FF 00 ... 7E 7F (left...center...right)
+					stickY		= -1 - (((HID_Packet[HID_CTRL->StickY.Offset] & 0xFC) >> 2) | ((HID_Packet[4] & 0x03) << 6));	//raw 80 81...FF 00 ... 7E 7F (up...center...down)
+					substickX	= HID_Packet[HID_CTRL->CStickX.Offset] * 4;		//raw E0 E1...FF 00 ... 1E 1F (left...center...right)
+					substickY	= 127 - (HID_Packet[HID_CTRL->CStickY.Offset] * 2);	//raw 00 01...3F 40 ... 7E 7F (up...center...down)
+					break;
+
+				case HID_QUIRK_THRUSTMASTER_DUAL_ANALOG_4:
+					// Thrustmaster Dual Analog 4
+					stickX		= HID_Packet[HID_CTRL->StickX.Offset];		//raw 80 81...FF 00 ... 7E 7F (left...center...right)
+					stickY		= -1 - HID_Packet[HID_CTRL->StickY.Offset];	//raw 80 81...FF 00 ... 7E 7F (up...center...down)
+					substickX	= HID_Packet[HID_CTRL->CStickX.Offset];		//raw 80 81...FF 00 ... 7E 7F (left...center...right)
+					substickY	= 127 - HID_Packet[HID_CTRL->CStickY.Offset];	//raw 00 01...7F 80 ... FE FF (up...center...down)
+					break;
+
+				case HID_QUIRK_MAYFLASH_CCPRO_ADAPTER:
+					// Mayflash Classic Controller Pro Adapter
+					stickX		= ((HID_Packet[HID_CTRL->StickX.Offset] & 0x3F) << 2) - 128;	//raw 06 07 ... 1E 1F 20 ... 37 38 (left ... center ... right)
+					stickY		= 127 - ((((HID_Packet[HID_CTRL->StickY.Offset] & 0x0F) << 2) | ((HID_Packet[3] & 0xC0) >> 6)) << 2);	//raw 06 07 ... 1F 20 21 ... 38 39 (up, center, down)
+					substickX	= ((HID_Packet[HID_CTRL->CStickX.Offset] & 0x1F) << 3) - 128;	//raw 03 04 ... 0E 0F 10 ... 1B 1C (left ... center ... right)
+					substickY	= 127 - ((((HID_Packet[HID_CTRL->CStickY.Offset] & 0x03) << 3) | ((HID_Packet[5] & 0xE0) >> 5)) << 3);	//raw 03 04 ... 1F 10 11 ... 1C 1D (up, center, down)
+					break;
+
+				case HID_QUIRK_WIIU_GCN_ADAPTER:
+					// Nintendo WiiU GameCube Adapter
+					stickX		= HID_Packet[HID_CTRL->StickX.Offset] - 128;	//raw 1D 1E 1F ... 7F 80 81 ... E7 E8 E9 (left ... center ... right)
+					stickY		= HID_Packet[HID_CTRL->StickY.Offset] - 128;	//raw EE ED EC ... 82 81 80 7F 7E ... 1A 19 18 (up, center, down)
+					substickX	= HID_Packet[HID_CTRL->CStickX.Offset] - 128;	//raw 22 23 24 ... 7F 80 81 ... D2 D3 D4 (left ... center ... right)
+					substickY	= HID_Packet[HID_CTRL->CStickY.Offset] - 128;	//raw DB DA D9 ... 81 80 7F ... 2B 2A 29 (up, center, down)
+					break;
+
+				default:
+					// Standard sticks
+					stickX		= HID_Packet[HID_CTRL->StickX.Offset] - 128;
+					stickY		= 127 - HID_Packet[HID_CTRL->StickY.Offset];
+					substickX	= HID_Packet[HID_CTRL->CStickX.Offset] - 128;
+					substickY	= 127 - HID_Packet[HID_CTRL->CStickY.Offset];
+					break;
+			}
 		}
-		else
-		if ((HID_CTRL->VID == 0x0926) && (HID_CTRL->PID == 0x2526))	//Mayflash 3 in 1 Magic Joy Box 
-		{
-			stickX		= HID_Packet[HID_CTRL->StickX.Offset] - 128;	//raw 1A 1B...80 81 ... E4 E5 (left...center...right)
-			stickY		= 127 - HID_Packet[HID_CTRL->StickY.Offset];	//raw 0E 0F...7E 7F ... E4 E5 (up...center...down)
-			if (HID_Packet[HID_CTRL->CStickX.Offset] >= 0)
-				substickX	= (HID_Packet[HID_CTRL->CStickX.Offset] * 2) - 128;	//raw 90 91 10 11...41 42...68 69 EA EB (left...center...right) the 90 91 EA EB are hard right and left almost to the point of breaking
-			else if (HID_Packet[HID_CTRL->CStickX.Offset] < 0xD0)
-				substickX	= 0xFE;
-			else
-				substickX	= 0;
-			substickY	= 127 - ((HID_Packet[HID_CTRL->CStickY.Offset] - 128) * 4);	//raw 88 89...9E 9F A0 A1 ... BA BB (up...center...down)
-		}
-		else
-		if ((HID_CTRL->VID == 0x045E) && (HID_CTRL->PID == 0x001B))	//Microsoft Sidewinder Force Feedback 2 Joystick
-		{
-			stickX		= ((HID_Packet[HID_CTRL->StickX.Offset] & 0xFC) >> 2) | ((HID_Packet[2] & 0x03) << 6);			//raw 80 81...FF 00 ... 7E 7F (left...center...right)
-			stickY		= -1 - (((HID_Packet[HID_CTRL->StickY.Offset] & 0xFC) >> 2) | ((HID_Packet[4] & 0x03) << 6));	//raw 80 81...FF 00 ... 7E 7F (up...center...down)
-			substickX	= HID_Packet[HID_CTRL->CStickX.Offset] * 4;			//raw E0 E1...FF 00 ... 1E 1F (left...center...right)
-			substickY	= 127 - (HID_Packet[HID_CTRL->CStickY.Offset] * 2);	//raw 00 01...3F 40 ... 7E 7F (up...center...down)
-		}
-		else
-		if ((HID_CTRL->VID == 0x044F) && (HID_CTRL->PID == 0xB315))	//Thrustmaster Dual Analog 4
-		{
-			stickX		= HID_Packet[HID_CTRL->StickX.Offset];			//raw 80 81...FF 00 ... 7E 7F (left...center...right)
-			stickY		= -1 - HID_Packet[HID_CTRL->StickY.Offset];		//raw 80 81...FF 00 ... 7E 7F (up...center...down)
-			substickX	= HID_Packet[HID_CTRL->CStickX.Offset];			//raw 80 81...FF 00 ... 7E 7F (left...center...right)
-			substickY	= 127 - HID_Packet[HID_CTRL->CStickY.Offset];	//raw 00 01...7F 80 ... FE FF (up...center...down)
-		}
-		else
-		if ((HID_CTRL->VID == 0x0925) && (HID_CTRL->PID == 0x03E8))	//Mayflash Classic Controller Pro Adapter
-		{
-			stickX		= ((HID_Packet[HID_CTRL->StickX.Offset] & 0x3F) << 2) - 128;	//raw 06 07 ... 1E 1F 20 ... 37 38 (left ... center ... right)
-			stickY		= 127 - ((((HID_Packet[HID_CTRL->StickY.Offset] & 0x0F) << 2) | ((HID_Packet[3] & 0xC0) >> 6)) << 2);	//raw 06 07 ... 1F 20 21 ... 38 39 (up, center, down)
-			substickX	= ((HID_Packet[HID_CTRL->CStickX.Offset] & 0x1F) << 3) - 128;	//raw 03 04 ... 0E 0F 10 ... 1B 1C (left ... center ... right)
-			substickY	= 127 - ((((HID_Packet[HID_CTRL->CStickY.Offset] & 0x03) << 3) | ((HID_Packet[5] & 0xE0) >> 5)) << 3);	//raw 03 04 ... 1F 10 11 ... 1C 1D (up, center, down)
-		}
-		else
-		if ((HID_CTRL->VID == 0x057E) && (HID_CTRL->PID == 0x0337))	//Nintendo wiiu Gamecube Adapter
-		{
-			stickX		= HID_Packet[HID_CTRL->StickX.Offset] - 128;	//raw 1D 1E 1F ... 7F 80 81 ... E7 E8 E9 (left ... center ... right)
-			stickY		= HID_Packet[HID_CTRL->StickY.Offset] - 128;	//raw EE ED EC ... 82 81 80 7F 7E ... 1A 19 18 (up, center, down)
-			substickX	= HID_Packet[HID_CTRL->CStickX.Offset] - 128;	//raw 22 23 24 ... 7F 80 81 ... D2 D3 D4 (left ... center ... right)
-			substickY	= HID_Packet[HID_CTRL->CStickY.Offset] - 128;	//raw DB DA D9 ... 81 80 7F ... 2B 2A 29 (up, center, down)
-		}
-		else	//standard sticks
-		{
-			stickX		= HID_Packet[HID_CTRL->StickX.Offset] - 128;
-			stickY		= 127 - HID_Packet[HID_CTRL->StickY.Offset];
-			substickX	= HID_Packet[HID_CTRL->CStickX.Offset] - 128;
-			substickY	= 127 - HID_Packet[HID_CTRL->CStickY.Offset];
-		}
-	
+
 		s8 tmp_stick = 0;
 		if(stickX > HID_CTRL->StickX.DeadZone && stickX > 0)
 			tmp_stick = (double)(stickX - HID_CTRL->StickX.DeadZone) * HID_CTRL->StickX.Radius / 1000;
 		else if(stickX < -HID_CTRL->StickX.DeadZone && stickX < 0)
 			tmp_stick = (double)(stickX + HID_CTRL->StickX.DeadZone) * HID_CTRL->StickX.Radius / 1000;
 		Pad[chan].stickX = tmp_stick;
-	
+
 		tmp_stick = 0;
 		if(stickY > HID_CTRL->StickY.DeadZone && stickY > 0)
 			tmp_stick = (double)(stickY - HID_CTRL->StickY.DeadZone) * HID_CTRL->StickY.Radius / 1000;
 		else if(stickY < -HID_CTRL->StickY.DeadZone && stickY < 0)
 			tmp_stick = (double)(stickY + HID_CTRL->StickY.DeadZone) * HID_CTRL->StickY.Radius / 1000;
 		Pad[chan].stickY = tmp_stick;
-	
+
 		tmp_stick = 0;
 		if(substickX > HID_CTRL->CStickX.DeadZone && substickX > 0)
 			tmp_stick = (double)(substickX - HID_CTRL->CStickX.DeadZone) * HID_CTRL->CStickX.Radius / 1000;
@@ -491,26 +498,28 @@ u32 _start(u32 calledByGame)
 		{	/* much to do with analog */
 			u8 tmp_triggerL = 0;
 			u8 tmp_triggerR = 0;
-			if (((HID_CTRL->VID == 0x0926) && (HID_CTRL->PID == 0x2526))	//Mayflash 3 in 1 Magic Joy Box 
-			 || ((HID_CTRL->VID == 0x2006) && (HID_CTRL->PID == 0x0118)))	//Trio Linker Plus 
+			switch (HID_CTRL->QuirkType)
 			{
-				tmp_triggerL =  HID_Packet[HID_CTRL->LAnalog] & 0xF0;	//high nibble raw 1x 2x ... Dx Ex 
-				tmp_triggerR = (HID_Packet[HID_CTRL->RAnalog] & 0x0F) * 16 ;	//low nibble raw x1 x2 ...xD xE
-				if(Pad[chan].button & PAD_TRIGGER_L)
-					tmp_triggerL = 255;
-				if(Pad[chan].button & PAD_TRIGGER_R)
-					tmp_triggerR = 255;
-			}
-			else
-			if ((HID_CTRL->VID == 0x0925) && (HID_CTRL->PID == 0x03E8))	//Mayflash Classic Controller Pro Adapter
-			{
-				tmp_triggerL =   ((HID_Packet[HID_CTRL->LAnalog] & 0x7C) >> 2) << 3;	//raw 04 ... 1F (out ... in)
-				tmp_triggerR = (((HID_Packet[HID_CTRL->RAnalog] & 0x0F) << 1) | ((HID_Packet[6] & 0x80) >> 7)) << 3;	//raw 03 ... 1F (out ... in)
-			}
-			else	//standard analog triggers
-			{
-				tmp_triggerL = HID_Packet[HID_CTRL->LAnalog];
-				tmp_triggerR = HID_Packet[HID_CTRL->RAnalog];
+				case HID_QUIRK_MAYFLASH_3_IN_1_MAGIC_JOY_BOX:	// Mayflash 3 in 1 Magic Joy Box 
+				case HID_QUIRK_TRIO_LINKER_PLUS:		// Trio Linker Plus
+					tmp_triggerL =  HID_Packet[HID_CTRL->LAnalog] & 0xF0;	//high nibble raw 1x 2x ... Dx Ex 
+					tmp_triggerR = (HID_Packet[HID_CTRL->RAnalog] & 0x0F) * 16 ;	//low nibble raw x1 x2 ...xD xE
+					if(Pad[chan].button & PAD_TRIGGER_L)
+						tmp_triggerL = 255;
+					if(Pad[chan].button & PAD_TRIGGER_R)
+						tmp_triggerR = 255;
+					break;
+
+				case HID_QUIRK_MAYFLASH_CCPRO_ADAPTER:		// Mayflash Classic Controller Pro Adapter
+					tmp_triggerL =  ((HID_Packet[HID_CTRL->LAnalog] & 0x7C) >> 2) << 3;	//raw 04 ... 1F (out ... in)
+					tmp_triggerR = (((HID_Packet[HID_CTRL->RAnalog] & 0x0F) << 1) | ((HID_Packet[6] & 0x80) >> 7)) << 3;	//raw 03 ... 1F (out ... in)
+					break;
+
+				default:
+					// Standard analog triggers
+					tmp_triggerL = HID_Packet[HID_CTRL->LAnalog];
+					tmp_triggerR = HID_Packet[HID_CTRL->RAnalog];
+					break;
 			}
 			/* Calculate left trigger with deadzone */
 			if(tmp_triggerL > DEADZONE)
