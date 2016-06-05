@@ -41,6 +41,11 @@
 #define LINESIZE 0x20
 #define CACHESIZE 0x4000
 
+#include "../common/include/types.h"
+// Required by usbstorage.c and some others.
+typedef u8 uint8_t;
+typedef u16 uint16_t;
+
 enum AHBDEV {
 	AHB_STARLET = 0, //or MEM2 or some controller or bus or ??
 	AHB_PPC = 1, //ppc or something else???
@@ -58,46 +63,20 @@ void fatal(const char *format, ...);
 
 void udelay(int us);
 
-typedef unsigned char u8;
-typedef unsigned char uint8_t;
-typedef unsigned short u16;
-typedef unsigned short uint16_t;
-typedef unsigned int u32;
-typedef unsigned long long u64;
-
 typedef int bool;
 typedef unsigned int sec_t;
 
-typedef signed char s8;
-typedef signed short s16;
-typedef signed int s32;
-typedef signed long long s64;
-
-typedef volatile unsigned char vu8;
-typedef volatile unsigned short vu16;
-typedef volatile unsigned int vu32;
-typedef volatile unsigned long long vu64;
-
-typedef volatile signed char vs8;
-typedef volatile signed short vs16;
-typedef volatile signed int vs32;
-typedef volatile signed long long vs64;
-
 typedef s32 size_t;
-
 typedef u32 u_int32_t;
 
 //libraries are built like that
 typedef s32 wchar_t;
-
 typedef s32(*ipccallback)(s32 result,void *usrdata);
 
 #include "ipc.h"
 #include "syscalls.h"
 
 #define NULL ((void *)0)
-
-#define ALIGNED(x) __attribute__((aligned(x)))
 
 #define STACK_ALIGN(type, name, cnt, alignment)         \
 	u8 _al__##name[((sizeof(type)*(cnt)) + (alignment) + \

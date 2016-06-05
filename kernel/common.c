@@ -1,5 +1,5 @@
-#include "string.h"
 #include "global.h"
+#include "string.h"
 #include "EXI.h"
 #include "Config.h"
 #include "debug.h"

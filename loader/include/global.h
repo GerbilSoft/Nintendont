@@ -28,6 +28,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "Config.h"
 #include "grrlib.h"
 
+// Nintendont common types and macros.
+#include "../../../common/include/types.h"
+
 #ifndef HW_RVL
 #define HW_RVL
 #endif
@@ -71,8 +74,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define		HW_REG_BASE		0xCD800000
 #define		HW_RESETS		(HW_REG_BASE + 0x194)
 
-#define ALIGNED(x) __attribute__((aligned(x)))
-
 #define ALIGN_FORWARD(x,align) \
 	((typeof(x))((((u32)(x)) + (align) - 1) & (~(align-1))))
 
@@ -111,7 +112,7 @@ typedef struct
 	u16 Type;			//	6	(0x1EA)
 	u64 Size;			//	8	(0x1EC)
 	u8	SHA1[20];		//  12	(0x1F4)
-} __attribute__((packed)) Content;
+} PACKED Content;
 
 typedef struct
 {
@@ -139,7 +140,7 @@ typedef struct
 
 	Content Contents[];		// 0x1E4 
 
-} __attribute__((packed)) TitleMetaData;
+} PACKED TitleMetaData;
 
 bool IsWiiU( void );
 // FIXME: This return type isn't quite correct...
