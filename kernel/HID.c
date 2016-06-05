@@ -95,6 +95,49 @@ extern char __hid_change_stack_addr, __hid_change_stack_size;
 #define HID_CFG_SIZE HID_STATUS+8
 #define HID_CFG_FILE 0x13003460
 
+/**
+ * Get an HID quirk type.
+ * @param VID USB vendor ID.
+ * @param PID USB product ID.
+ * @return HIDQuirkType, or 0 if no quirk is required.
+ */
+static inline u32 GetQuirkType(u32 VID, u32 PID)
+{
+	// Check for HID quirks.
+	u32 QuirkType = 0;
+
+	typedef struct {
+		u16 VID;
+		u16 PID;
+		u32 QuirkType;
+	} HID_quirk_t;
+	static const HID_quirk_t quirks[] = {
+		{0x057E, 0x0337, HID_QUIRK_WIIU_GCN_ADAPTER},
+		{0x0925, 0x03E8, HID_QUIRK_MAYFLASH_CCPRO_ADAPTER},
+		{0x044F, 0xB303, HID_QUIRK_LOGITECH_THRUSTMASTER_FIRESTORM_DUAL_ANALOG_2},
+		{0x0926, 0x2526, HID_QUIRK_MAYFLASH_3_IN_1_MAGIC_JOY_BOX},
+		{0x045E, 0x001B, HID_QUIRK_MS_SIDEWINDER_FF_2_JOYSTICK},
+		{0x044F, 0xB315, HID_QUIRK_THRUSTMASTER_DUAL_ANALOG_4},
+		{0x2006, 0x0118, HID_QUIRK_TRIO_LINKER_PLUS},
+		{0x054C, 0x0268, HID_QUIRK_PS3_DUALSHOCK},
+		{0, 0, 0}
+	};
+
+	const HID_quirk_t *quirk;
+	for (quirk = &quirks[0]; quirk->VID != 0; quirk++)
+	{
+		if (HID_CTRL->VID == quirk->VID &&
+		    HID_CTRL->PID == quirk->PID)
+		{
+			// Found a matching quirk entry.
+			QuirkType = quirk->QuirkType;
+			break;
+		}
+	}
+
+	return QuirkType;
+}
+
 void HIDInit( void )
 {
 	HIDHandle = IOS_Open("/dev/usb/hid", 0 );
@@ -214,18 +257,29 @@ s32 HIDOpen( u32 LoaderRequest )
 
 	free(HIDHeap);
 
-	if( DeviceVID == 0x054c && DevicePID == 0x0268 )
-	{
-		dbgprintf("HID:PS3 Dualshock Controller detected\r\n");
-		MemPacketSize = SS_DATA_LEN;
-		HIDPS3Init();
-		RumbleEnabled = 1;
-		HIDPS3SetRumble( 0, 0, 0, 0 );
-	}
-	else if( DeviceVID == 0x057e && DevicePID == 0x0337 )
-		HIDGCInit();
+	// Get the quirk type.
+	u32 QuirkType = GetQuirkType(HID_CTRL->VID, HID_CTRL->PID);
 
-//Load controller config
+	// PS3/GCN device init.
+	switch (QuirkType)
+	{
+		case HID_QUIRK_PS3_DUALSHOCK:
+			dbgprintf("HID:PS3 Dualshock Controller detected\r\n");
+			MemPacketSize = SS_DATA_LEN;
+			HIDPS3Init();
+			RumbleEnabled = 1;
+			HIDPS3SetRumble( 0, 0, 0, 0 );
+			break;
+
+		case HID_QUIRK_WIIU_GCN_ADAPTER:
+			HIDGCInit();
+			break;
+
+		default:
+			break;
+	}
+
+	// Load controller config
 	char *Data = NULL;
 	if(LoaderRequest)
 	{
@@ -504,6 +558,9 @@ s32 HIDOpen( u32 LoaderRequest )
 		dbgprintf("HID:Config file for VID:%04X PID:%04X loaded\r\n", HID_CTRL->VID, HID_CTRL->PID );
 	}
 
+	// Save the quirk type.
+	HID_CTRL->QuirkType = QuirkType;
+
 	if( HID_CTRL->Polltype == 0 )
 		MemPacketSize = 128;
 	else
@@ -518,7 +575,7 @@ s32 HIDOpen( u32 LoaderRequest )
 	sync_after_write(HID_Packet, MemPacketSize);
 
 	bool Polltype = HID_CTRL->Polltype;
-	if((HID_CTRL->VID == 0x057E) && (HID_CTRL->PID == 0x0337))
+	if (HID_CTRL->QuirkType == HID_QUIRK_WIIU_GCN_ADAPTER)
 	{
 		HIDRumble = HIDGCRumble;
 		RumbleEnabled = true;
