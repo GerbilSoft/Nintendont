@@ -28,6 +28,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "Config.h"
 #include "grrlib.h"
 
+// Nintendont common types and macros.
+#include "../../../common/include/types.h"
+
 #ifndef HW_RVL
 #define HW_RVL
 #endif
@@ -112,7 +115,7 @@ typedef struct
 	u16 Type;			//	6	(0x1EA)
 	u64 Size;			//	8	(0x1EC)
 	u8	SHA1[20];		//  12	(0x1F4)
-} __attribute__((packed)) Content;
+} PACKED Content;
 
 typedef struct
 {
@@ -140,7 +143,7 @@ typedef struct
 
 	Content Contents[];		// 0x1E4 
 
-} __attribute__((packed)) TitleMetaData;
+} PACKED TitleMetaData;
 
 bool IsWiiU( void );
 // FIXME: This return type isn't quite correct...
