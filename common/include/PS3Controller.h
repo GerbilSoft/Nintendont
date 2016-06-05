@@ -1,6 +1,8 @@
 #ifndef __PS3CONTROLLER_H__
 #define __PS3CONTROLLER_H__
 
+#include "types.h"
+
 #define SS_DATA_LEN        53 //Should be 49
 #define SS_LEDS_RUMBLE_LEN 32
 #define SS_VENDOR_ID       0x054C //Sony Corp.
@@ -91,7 +93,7 @@ struct SS_GAMEPAD
     u8                        unk7;
     struct SS_MOTION               motion;
     u8                        padding[3];
-}__attribute__((packed));
+} PACKED;
 
 struct SickSaxis
 {
