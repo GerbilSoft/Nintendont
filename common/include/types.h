@@ -5,6 +5,7 @@
 // gcc attributes
 #define ALIGNED(n)	__attribute__((aligned(n)))
 #define PACKED		__attribute__((packed))
+#define NORETURN    	__attribute__((noreturn))
 
 // On PowerPC, only define these types if
 // libogc's gctypes.h wasn't included already.

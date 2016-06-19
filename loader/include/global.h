@@ -74,9 +74,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define		HW_REG_BASE		0xCD800000
 #define		HW_RESETS		(HW_REG_BASE + 0x194)
 
-#define ALIGNED(x) __attribute__((aligned(x)))
-#define NORETURN __attribute__ ((noreturn))
-
 #define ALIGN_FORWARD(x,align) \
 	((typeof(x))((((u32)(x)) + (align) - 1) & (~(align-1))))
 
