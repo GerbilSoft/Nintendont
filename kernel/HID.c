@@ -58,21 +58,28 @@ u8 *RawRumbleDataOff = NULL;
 u32 RawRumbleDataLen = 0;
 u32 RumbleTransferLen = 0;
 u32 RumbleTransfers = 0;
-static const unsigned char rawData[] =
+
+// PS3 initialization data.
+static const unsigned char ps3InitData[49] =
 {
-	0x01, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xFF, 0x27, 0x10, 0x00, 0x32, 
-	0xFF, 0x27, 0x10, 0x00, 0x32, 0xFF, 0x27, 0x10, 0x00, 0x32, 0xFF, 0x27, 0x10, 0x00, 0x32, 0x00, 
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x01, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x02, 0xFF, 0x27, 0x10, 0x00, 0x32, 
+	0xFF, 0x27, 0x10, 0x00, 0x32, 0xFF, 0x27, 0x10,
+	0x00, 0x32, 0xFF, 0x27, 0x10, 0x00, 0x32, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 	0x00,
 };
 
 struct _usb_msg readreq ALIGNED(32);
 struct _usb_msg writereq ALIGNED(32);
-u8 *ps3buf = (u8*)NULL;
-u8 *gcbuf = (u8*)NULL;
+
+// PS3 and GameCube buffers.
+static u8 *ps3buf = NULL;
+static u8 *gcbuf = NULL;
 
 typedef void (*HIDReadFunc)();
-HIDReadFunc HIDRead = NULL;
+static HIDReadFunc HIDRead = NULL;
 
 typedef void (*RumbleFunc)(u32 Enable);
 RumbleFunc HIDRumble = NULL;
@@ -81,13 +88,15 @@ static usb_device_entry AttachedDevices[32] ALIGNED(32);
 
 static struct ipcmessage *hidreadmsg = NULL, *hidchangemsg = NULL;
 static u32 HIDRead_Thread = 0, HIDChange_Thread = 0;
-u8 *hidreadheap = NULL, *hidchangeheap = NULL;
-s32 hidreadqueue = -1, hidchangequeue = -1;
-vu32 hidread = 0, hidchange = 0;
+static u8 *hidreadheap = NULL, *hidchangeheap = NULL;
+static s32 hidreadqueue = -1, hidchangequeue = -1;
+static vu32 hidread = 0, hidchange = 0;
 static u32 HIDReadAlarm();
 static u32 HIDChangeAlarm();
 static s32 HIDInterruptMessage(u8 *Data, u32 Length, u32 Endpoint, s32 asyncqueue, struct ipcmessage *asyncmsg);
 static s32 HIDControlMessage(u8 *Data, u32 Length, u32 RequestType, u32 Request, u32 Value, s32 asyncqueue, struct ipcmessage *asyncmsg);
+
+// Set by the linker.
 extern char __hid_read_stack_addr, __hid_read_stack_size;
 extern char __hid_change_stack_addr, __hid_change_stack_size;
 
@@ -144,8 +153,9 @@ void HIDInit( void )
 	HIDHandle = IOS_Open("/dev/usb/hid", 0 );
 	if(HIDHandle < 0) return; //should never happen
 
-	ps3buf = (u8*)malloca( 64, 32 );
-	gcbuf = (u8*)malloca( 32,32 );
+	// Allocate the PS3 and GameCube buffers.
+	ps3buf = (u8*)malloca(64, 32);
+	gcbuf = (u8*)malloca(32, 32);
 
 	hidreadheap = (u8*)malloca(32,32);
 	hidreadqueue = mqueue_create(hidreadheap, 1);
@@ -176,9 +186,11 @@ s32 HIDOpen( u32 LoaderRequest )
 	memset32(&readreq, 0, sizeof(struct _usb_msg));
 	memset32(&writereq, 0, sizeof(struct _usb_msg));
 
+	// Initialize the PS3 buffer.
 	memset32(ps3buf, 0, 64);
-	memcpy(ps3buf, rawData, sizeof(rawData));
+	memcpy(ps3buf, ps3InitData, sizeof(ps3InitData));
 
+	// Initialize the GameCube buffer.
 	memset32(gcbuf, 0, 32);
 	gcbuf[0] = 0x13;
 
@@ -715,7 +727,7 @@ void HIDPS3SetLED( u8 led )
 	ps3buf[10] = ss_led_pattern[led];
 	sync_after_write(ps3buf, 64);
 
-	s32 ret = HIDInterruptMessage(ps3buf, sizeof(rawData), 0x02, 0, NULL);
+	s32 ret = HIDInterruptMessage(ps3buf, sizeof(ps3InitData), 0x02, 0, NULL);
 	if( ret < 0 ) 
 		dbgprintf("ES:IOS_Ioctl():%d\r\n", ret );
 }
@@ -725,13 +737,11 @@ void HIDPS3SetRumble( u8 duration_right, u8 power_right, u8 duration_left, u8 po
 	ps3buf[5] = power_right;
 	sync_after_write(ps3buf, 64);
 
-	s32 ret = HIDInterruptMessage(ps3buf, sizeof(rawData), 0x02, 0, NULL);
+	s32 ret = HIDInterruptMessage(ps3buf, sizeof(ps3InitData), 0x02, 0, NULL);
 	if( ret < 0 )
 		dbgprintf("ES:IOS_Ioctl():%d\r\n", ret );
 }
 
-vu32 HIDRumbleCurrent = 0, HIDRumbleLast = 0;
-vu32 MotorCommand = 0x13002700;
 void HIDPS3Read()
 {
 	if( !PS3LedSet && Packet[4] )
@@ -968,6 +978,10 @@ u32 ConfigGetDecValue( char *Data, const char *EntryName, u32 Entry )
 
 	return ret;
 }
+
+// Rumble status.
+static vu32 HIDRumbleCurrent = 0, HIDRumbleLast = 0;
+static vu32 MotorCommand = 0x13002700;
 
 void HIDUpdateRegisters(u32 LoaderRequest)
 {
