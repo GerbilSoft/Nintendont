@@ -41,9 +41,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "font_ttf.h"
 #include "dip.h"
 
+// Background image.
+#include "background_png.h"
+
 GRRLIB_ttfFont *myFont;
 GRRLIB_texImg *background;
 GRRLIB_texImg *screen_buffer;
+bool bg_isWidescreen = false;
+static float bg_xScale = 1.0f;
+static int bg_xPos = 0;
 
 u32 POffset;
 
@@ -147,7 +153,12 @@ void RAMInit(void)
 	
 	*(vu32*)0x8000315C = 0x81;
 }
-void Initialise()
+
+/**
+ * Initialize the loader.
+ * This also loads the background image.
+ */
+void Initialise(void)
 {
 	int i;
 	AUDIO_Init(NULL);
@@ -159,9 +170,31 @@ void Initialise()
 	myFont = GRRLIB_LoadTTF(font_ttf, font_ttf_size);
 	background = GRRLIB_LoadTexturePNG(background_png);
 	screen_buffer = GRRLIB_CreateEmptyTexture(rmode->fbWidth, rmode->efbHeight);
+
+	// Calculate the background image scale.
+	bg_isWidescreen = (CONF_GetAspectRatio() == CONF_ASPECT_16_9);
+	if (bg_isWidescreen)
+	{
+		// Widescreen. 0.75x scaling, 80px offset.
+		bg_xScale = 0.75f;
+		bg_xPos = 80;
+	}
+	else
+	{
+		// Standard screen. 1.0x scaling, 0px offset.
+		bg_xScale = 1.0f;
+		bg_xPos = 0;
+	}
+
 	for (i=0; i<255; i +=5) // Fade background image in from black screen
 	{
-		GRRLIB_DrawImg(0, 0, background, 0, 1, 1, RGBA(255, 255, 255, i)); // Opacity increases as i does
+		if (bg_isWidescreen)
+		{
+			// Clear the sides.
+			GRRLIB_Rectangle(0, 0, 80, 480, RGBA(222, 223, 224, i), true);
+			GRRLIB_Rectangle(80+480, 0, 80, 480, RGBA(222, 223, 224, i), true);
+		}
+		GRRLIB_DrawImg(bg_xPos, 0, background, 0, bg_xScale, 1, RGBA(255, 255, 255, i)); // Opacity increases as i does
 		GRRLIB_Render();
 	}
 	ClearScreen();
@@ -291,7 +324,13 @@ bool LoadNinCFG(void)
 
 inline void ClearScreen()
 {
-	GRRLIB_DrawImg(0, 0, background, 0, 1, 1, 0xFFFFFFFF);
+	if (bg_isWidescreen)
+	{
+		// Clear the sides.
+		GRRLIB_Rectangle(0, 0, 80, 480, RGBA(222, 223, 224, 255), true);
+		GRRLIB_Rectangle(80+480, 0, 80, 480, RGBA(222, 223, 224, 255), true);
+	}
+	GRRLIB_DrawImg(bg_xPos, 0, background, 0, bg_xScale, 1, RGBA(255, 255, 255, 255));
 }
 
 static inline char ascii(char s)
