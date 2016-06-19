@@ -267,36 +267,44 @@ u32 _start(u32 calledByGame)
 		used |= (1<<chan);
 
 		Rumble |= ((1<<31)>>chan);
+
 		/* first buttons */
 		u16 button = 0;
 		if(HID_CTRL->DPAD == 0)
 		{
 			if( HID_Packet[HID_CTRL->Left.Offset] & HID_CTRL->Left.Mask )
 				button |= PAD_BUTTON_LEFT;
-	
 			if( HID_Packet[HID_CTRL->Right.Offset] & HID_CTRL->Right.Mask )
 				button |= PAD_BUTTON_RIGHT;
-	
 			if( HID_Packet[HID_CTRL->Down.Offset] & HID_CTRL->Down.Mask )
 				button |= PAD_BUTTON_DOWN;
-	
 			if( HID_Packet[HID_CTRL->Up.Offset] & HID_CTRL->Up.Mask )
 				button |= PAD_BUTTON_UP;
 		}
 		else
 		{
-			if(((HID_Packet[HID_CTRL->Up.Offset] & HID_CTRL->DPADMask) == HID_CTRL->Up.Mask)		 || ((HID_Packet[HID_CTRL->UpLeft.Offset] & HID_CTRL->DPADMask) == HID_CTRL->UpLeft.Mask)			|| ((HID_Packet[HID_CTRL->RightUp.Offset]	& HID_CTRL->DPADMask) == HID_CTRL->RightUp.Mask))
-				button |= PAD_BUTTON_UP;
-	
-			if(((HID_Packet[HID_CTRL->Right.Offset] & HID_CTRL->DPADMask) == HID_CTRL->Right.Mask) || ((HID_Packet[HID_CTRL->DownRight.Offset] & HID_CTRL->DPADMask) == HID_CTRL->DownRight.Mask)	|| ((HID_Packet[HID_CTRL->RightUp.Offset] & HID_CTRL->DPADMask) == HID_CTRL->RightUp.Mask))
-				button |= PAD_BUTTON_RIGHT;
-	
-			if(((HID_Packet[HID_CTRL->Down.Offset] & HID_CTRL->DPADMask) == HID_CTRL->Down.Mask)	 || ((HID_Packet[HID_CTRL->DownRight.Offset] & HID_CTRL->DPADMask) == HID_CTRL->DownRight.Mask)	|| ((HID_Packet[HID_CTRL->DownLeft.Offset] & HID_CTRL->DPADMask) == HID_CTRL->DownLeft.Mask))
-				button |= PAD_BUTTON_DOWN;
-	
-			if(((HID_Packet[HID_CTRL->Left.Offset] & HID_CTRL->DPADMask) == HID_CTRL->Left.Mask)	 || ((HID_Packet[HID_CTRL->DownLeft.Offset] & HID_CTRL->DPADMask) == HID_CTRL->DownLeft.Mask)		|| ((HID_Packet[HID_CTRL->UpLeft.Offset] & HID_CTRL->DPADMask) == HID_CTRL->UpLeft.Mask))
+			// Check for cardinal directions first.
+			if ((HID_Packet[HID_CTRL->Left.Offset] & HID_CTRL->DPADMask) == HID_CTRL->Left.Mask)
 				button |= PAD_BUTTON_LEFT;
+			if ((HID_Packet[HID_CTRL->Right.Offset] & HID_CTRL->DPADMask) == HID_CTRL->Right.Mask)
+				button |= PAD_BUTTON_RIGHT;
+			if ((HID_Packet[HID_CTRL->Down.Offset] & HID_CTRL->DPADMask) == HID_CTRL->Down.Mask)
+				button |= PAD_BUTTON_DOWN;
+			if ((HID_Packet[HID_CTRL->Up.Offset] & HID_CTRL->DPADMask) == HID_CTRL->Up.Mask)
+				button |= PAD_BUTTON_UP;
+
+			// Check for diagonals.
+			if ((HID_Packet[HID_CTRL->UpLeft.Offset] & HID_CTRL->DPADMask) == HID_CTRL->UpLeft.Mask)
+				button |= (PAD_BUTTON_UP | PAD_BUTTON_LEFT);
+			if ((HID_Packet[HID_CTRL->RightUp.Offset] & HID_CTRL->DPADMask) == HID_CTRL->RightUp.Mask)
+				button |= PAD_BUTTON_UP | PAD_BUTTON_RIGHT;
+			if ((HID_Packet[HID_CTRL->DownRight.Offset] & HID_CTRL->DPADMask) == HID_CTRL->DownRight.Mask)
+				button |= PAD_BUTTON_DOWN | PAD_BUTTON_RIGHT;
+			if ((HID_Packet[HID_CTRL->DownLeft.Offset] & HID_CTRL->DPADMask) == HID_CTRL->DownLeft.Mask)
+				button |= PAD_BUTTON_DOWN | PAD_BUTTON_LEFT;
 		}
+
+		// Face buttons and Z.
 		if(HID_Packet[HID_CTRL->A.Offset] & HID_CTRL->A.Mask)
 			button |= PAD_BUTTON_A;
 		if(HID_Packet[HID_CTRL->B.Offset] & HID_CTRL->B.Mask)
