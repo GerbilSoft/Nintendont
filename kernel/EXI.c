@@ -877,7 +877,7 @@ void EXIReadFontFile(u8* Data, u32 Length)
 }
 
 //SegaBoot 3.11 with Free Play enabled
-unsigned int sb311block[54] =
+static const unsigned int sb311block[54] =
 {
     0x41434255, 0x30303031, 0x007D0512, 0x01000000, 0x00000311, 0x53424C4B, 
     0x00000000, 0x63090400, 0x01010A01, 0x01010001, 0x01010101, 0x01010101, 
@@ -888,7 +888,7 @@ unsigned int sb311block[54] =
     0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 
     0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x200E1AFF,
     0xFFFF0000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-} ;
+};
 
 static bool TRIGameStarted = false;
 //make sure ambbBackupMem is filled correctly
