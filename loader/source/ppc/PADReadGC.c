@@ -27,10 +27,8 @@ static vu32* SIInited = (u32*)0x93002740;
 static vu32* PADSwitchRequired = (u32*)0x93002744;
 static vu32* PADForceConnected = (u32*)0x93002748;
 
-static u32 PrevAdapterChannel1 = 0;
-static u32 PrevAdapterChannel2 = 0;
-static u32 PrevAdapterChannel3 = 0;
-static u32 PrevAdapterChannel4 = 0;
+// Previous HID channels.
+static u32 PrevAdapterChannel[4] = {0, 0, 0, 0};
 
 const s8 DEADZONE = 0x1A;
 #define HID_PAD_NONE	4
@@ -202,14 +200,21 @@ u32 _start(u32 calledByGame)
 		}
 		if (HID_CTRL->MultiIn == 2)		//multiple controllers connected to a single usb port
 		{
-			used |= (1<<(PrevAdapterChannel1 + chan)) | (1<<(PrevAdapterChannel2 + chan)) | (1<<(PrevAdapterChannel3 + chan))| (1<<(PrevAdapterChannel4 + chan));	//depending on adapter it may only send every 4th time
+			//depending on adapter it may only send every 4th time
+			used |= (1<<(PrevAdapterChannel[0] + chan)) |
+				(1<<(PrevAdapterChannel[1] + chan)) |
+				(1<<(PrevAdapterChannel[2] + chan)) |
+				(1<<(PrevAdapterChannel[3] + chan));
+
 			chan = chan + HID_Packet[0] - 1;	// the controller number is in the first byte 
 			if (chan >= NIN_CFG_MAXPAD)		//if would be higher than the maxnumber of controllers
 				continue;	//toss it and try next usb port
-			PrevAdapterChannel1 = PrevAdapterChannel2;
-			PrevAdapterChannel2 = PrevAdapterChannel3;
-			PrevAdapterChannel3 = PrevAdapterChannel4;
-			PrevAdapterChannel4 = HID_Packet[0] - 1;
+
+			// Shift the channels over.
+			PrevAdapterChannel[0] = PrevAdapterChannel[1];
+			PrevAdapterChannel[1] = PrevAdapterChannel[2];
+			PrevAdapterChannel[2] = PrevAdapterChannel[3];
+			PrevAdapterChannel[3] = HID_Packet[0] - 1;
 		}
 
 		if (HID_CTRL->MultiIn == 3)		//multiple controllers connected to a single usb port all in one message
