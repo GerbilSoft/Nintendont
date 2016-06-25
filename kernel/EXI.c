@@ -720,9 +720,11 @@ void EXIUpdateRegistersNEW( void )
 							ret = 1;
 							break;
 
+#ifdef GCNCARD_ENABLE_SLOT_B
 						case EXI_DEV_MEMCARD_B:
 							ret = GCNCard_IsEnabled(1);
 							break;
+#endif /* GCNCARD_ENABLE_SLOT_B */
 
 						case EXI_DEV_AD16:
 						default:
@@ -757,9 +759,11 @@ void EXIUpdateRegistersNEW( void )
 						EXIDeviceMemoryCard(0, (u8*)data, len, mode);
 						break;
 
+#ifdef GCNCARD_ENABLE_SLOT_B
 					case EXI_DEV_MEMCARD_B:
 						EXIDeviceMemoryCard(1, (u8*)data, len, mode);
 						break;
+#endif /* GCNCARD_ENABLE_SLOT_B */
 
 					case EXI_DEV_MASK_ROM_RTC_SRAM_UART:
 						EXIDevice_ROM_RTC_SRAM_UART( (u8*)data, len, mode );
@@ -791,9 +795,11 @@ void EXIUpdateRegistersNEW( void )
 						EXIDeviceMemoryCard(0, ptr, len, mode);
 						break;
 
+#ifdef GCNCARD_ENABLE_SLOT_B
 					case EXI_DEV_MEMCARD_B:
 						EXIDeviceMemoryCard(1, ptr, len, mode);
 						break;
+#endif /* GCNCARD_ENABLE_SLOT_B */
 
 					case EXI_DEV_MASK_ROM_RTC_SRAM_UART:
 						EXIDevice_ROM_RTC_SRAM_UART( ptr, len, mode );
