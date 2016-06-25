@@ -31,6 +31,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "Stream.h"
 #include "HID.h"
 #include "EXI.h"
+#include "GCNCard.h"
 #include "debug.h"
 #include "GCAM.h"
 #include "Patch.h"
@@ -324,7 +325,7 @@ int _main( int argc, char *argv[] )
 		{
 			if(TimerDiffSeconds(Now) > 2) /* after 3 second earliest */
 			{
-				EXISaveCard();
+				GCNCard_Save();
 				SaveCard = false;
 			}
 		}
@@ -393,7 +394,7 @@ int _main( int argc, char *argv[] )
 		#endif
 		StreamUpdateRegisters();
 		CheckOSReport();
-		if(EXICheckCard())
+		if(GCNCard_CheckChanges())
 		{
 			Now = read32(HW_TIMER);
 			SaveCard = true;
