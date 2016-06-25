@@ -25,7 +25,13 @@ typedef struct _GCNCard_ctx {
 	u32 BlockOffHigh;       // High address of last modification.
 	u32 CARDWriteCount;     // Write count. (TODO: Is this used anywhere?)
 } GCNCard_ctx;
+#ifdef GCNCARD_ENABLE_SLOT_B
 static GCNCard_ctx memCard[2] __attribute__((aligned(32)));
+#else /* !GCNCARD_ENABLE_SLOT_B */
+static GCNCard_ctx memCard[1] __attribute__((aligned(32)));
+#endif /* GCNCARD_ENABLE_SLOT_B */
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 
 static void GCNCard_InitCtx(GCNCard_ctx *ctx)
 {
@@ -40,7 +46,7 @@ static void GCNCard_InitCtx(GCNCard_ctx *ctx)
  */
 inline u32 GCNCard_IsEnabled(int slot)
 {
-	if (slot < 0 || slot > 2)
+	if (slot < 0 || slot > ARRAY_SIZE(memCard))
 		return 0;
 
 	// Card is enabled if it's larger than 0 bytes.
@@ -60,11 +66,13 @@ int GCNCard_Load(int slot)
 		case 0:
 			// Slot A
 			break;
+#ifdef GCNCARD_ENABLE_SLOT_B
 		case 1:
 			// Slot B (not valid on Triforce)
 			if (TRIGame != 0)
 				return -1;
 			break;
+#endif /* GCNCARD_ENABLE_SLOT_B */
 		default:
 			// Invalid slot.
 			return -2;
@@ -89,11 +97,13 @@ int GCNCard_Load(int slot)
 			// JPN game. Append a 'j'.
 			*fname_ptr++ = 'j';
 		}
+#ifdef GCNCARD_ENABLE_SLOT_B
 		if (slot)
 		{
 			// Slot B. Append a 'b'.
 			*fname_ptr++ = 'b';
 		}
+#endif /* GCNCARD_ENABLE_SLOT_B */
 
 		// Append the file extension.
 		memcpy(fname_ptr, ".raw", 4);
@@ -104,6 +114,7 @@ int GCNCard_Load(int slot)
 		memcpy(fname_ptr, &GameID, 4);
 		fname_ptr += 4;
 
+#ifdef GCNCARD_ENABLE_SLOT_B
 		if (slot)
 		{
 			// Slot B. Append "_B".
@@ -111,6 +122,7 @@ int GCNCard_Load(int slot)
 			*(fname_ptr+1) = 'B';
 			fname_ptr += 2;
 		}
+#endif /* GCNCARD_ENABLE_SLOT_B */
 
 		// Append the file extension.
 		memcpy(fname_ptr, ".raw", 4);
@@ -126,6 +138,7 @@ int GCNCard_Load(int slot)
 #ifdef DEBUG_EXI
 		dbgprintf("EXI: Slot %c: Failed to open %s: %u\r\n", (slot+'A'), ctx->filename, ret );
 #endif
+#ifdef GCNCARD_ENABLE_SLOT_B
 		if (slot == 0)
 		{
 			// Slot A failure is fatal.
@@ -135,6 +148,10 @@ int GCNCard_Load(int slot)
 		// Slot B failure will simply disable Slot B.
 		dbgprintf("EXI: Slot %c has been disabled.\r\n", (slot+'A'));
 		return -3;
+#else /* !GCNCARD_ENABLE_SLOT_B */
+		// Slot A failure is fatal.
+		Shutdown();
+#endif /* GCNCARD_ENABLE_SLOT_B */
 	}
 
 #ifdef DEBUG_EXI
@@ -152,6 +169,7 @@ int GCNCard_Load(int slot)
 	{
 		dbgprintf("EXI: Slot %c unexpected size %s: %u\r\n",
 				(slot+'A'), ctx->filename, fd.obj.objsize);
+#ifdef GCNCARD_ENABLE_SLOT_B
 		if (slot == 0)
 		{
 			// Slot A failure is fatal.
@@ -162,8 +180,13 @@ int GCNCard_Load(int slot)
 		dbgprintf("EXI: Slot %c has been disabled.\r\n", (slot+'A'));
 		f_close(&fd);
 		return -4;
+#else /* !GCNCARD_ENABLE_SLOT_B */
+		// Slot A failure is fatal.
+		Shutdown();
+#endif /* GCNCARD_ENABLE_SLOT_B */
 	}
 
+#if GCNCARD_ENABLE_SLOT_B
 	if (slot == 0)
 	{
 		// Slot A starts at GCNCard_base.
@@ -188,6 +211,12 @@ int GCNCard_Load(int slot)
 		}
 		ctx->base = memCard[0].base + memCard[0].size;
 	}
+#else /* !GCNCARD_ENABLE_SLOT_B */
+	// Slot A starts at GCNCard_base.
+	ctx->base = GCNCard_base;
+	// Set the memory card size for Slot A only.
+	ConfigSetMemcardBlocks(FindBlocks);
+#endif /* GCNCARD_ENABLE_SLOT_B */
 
 	// Size and "code".
 	ctx->size = fd.obj.objsize;
@@ -210,11 +239,13 @@ int GCNCard_Load(int slot)
 	// Synchronize the memory card data.
 	sync_after_write(ctx->base, ctx->size);
 
+#ifdef GCNCARD_ENABLE_SLOT_B
 	if (slot == 1)
 	{
 		// Slot B card image loaded successfully.
 		ncfg->Config |= NIN_CFG_MC_SLOTB;
 	}
+#endif /* GCNCARD_ENABLE_SLOT_B */
 
 	return 0;
 }
@@ -225,7 +256,11 @@ int GCNCard_Load(int slot)
 */
 u32 GCNCard_GetTotalSize(void)
 {
+#ifdef GCNCARD_ENABLE_SLOT_B
 	return (memCard[0].size + memCard[1].size);
+#else /* !GCNCARD_ENABLE_SLOT_B */
+	return memCard[0].size;
+#endif /* GCNCARD_ENABLE_SLOT_B */
 }
 
 /**
@@ -236,7 +271,7 @@ bool GCNCard_CheckChanges(void)
 {
 	int slot;
 	bool ret = false;
-	for (slot = 0; slot < 2; slot++)
+	for (slot = 0; slot < ARRAY_SIZE(memCard); slot++)
 	{
 		if (memCard[slot].changed)
 		{
@@ -259,7 +294,7 @@ void GCNCard_Save(void)
 	}
 
 	int slot;
-	for (slot = 0; slot < 2; slot++)
+	for (slot = 0; slot < ARRAY_SIZE(memCard); slot++)
 	{
 		if (!GCNCard_IsEnabled(slot))
 		{
