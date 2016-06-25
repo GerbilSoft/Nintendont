@@ -6,6 +6,9 @@
 #include "debug.h"
 #include "ff_utf8.h"
 
+// GCN card structures.
+#include "GCNCard_Struct.h"
+
 // Triforce variables.
 extern vu32 TRIGame;
 
@@ -51,6 +54,90 @@ inline u32 GCNCard_IsEnabled(int slot)
 
 	// Card is enabled if it's larger than 0 bytes.
 	return (memCard[slot].size > 0);
+}
+
+// TODO: Combine with SRAM_UpdateChecksum().
+static void doChecksum(const u16 *buffer, u32 size, u16 *c1, u16 *c2)
+{
+	u32 i;
+	*c1 = 0; *c2 = 0;
+	for (i = size/sizeof(u16); i > 0; i--, buffer++)
+	{
+		*c1 += *buffer;
+		*c2 += *buffer ^ 0xFFFF;
+	}
+	if (*c1 == 0xFFFF) *c1 = 0;
+	if (*c2 == 0xFFFF) *c2 = 0;
+}
+
+/**
+ * Format a GCN card image in memory.
+ * @param ctx GCNCard_ctx to format.
+ * @return 0 on success; non-zero on reror.
+ */
+static int GCNCard_Format(GCNCard_ctx *ctx)
+{
+	if (!ctx->base || ctx->size < 524288)
+	{
+		// Invalid base address and/or size.
+		return -1;
+	}
+
+	// Get the Game ID.
+	const u32 GameID = ConfigGetGameID();
+
+	// Fill the header and directory blocks with 0xFF.
+	memset32(ctx->base, 0xFFFFFFFF, 0x6000);
+	// Clear the rest of the memory card area.
+	memset32(ctx->base+0x6000, 0, ctx->size-0x6000);
+
+	// Header block.
+	card_header *header = (card_header*)ctx->base;
+	// Normally this area contains a checksum which is built via SRAM and formatting time, you can
+	// skip that though because if the formatting time is 0 the resulting checksum is also 0 ;)
+	memset(header->reserved1, 0, sizeof(header->reserved1));
+	header->formatTime = 0;		// TODO: Actually set this?
+	// From SRAM as defined in PatchCodes.h
+	header->sramBias = 0x17CA2A85;
+	// Use current language for SRAM language
+	header->sramLang = ncfg->Language;
+	// Memory Card File Mode
+	header->reserved2 = ((GameID & 0xFF) == 'J' ? 2 : 0);
+	// Assuming slot A.
+	header->device_id = 0;
+	// Memory Card size in MBits total
+	header->size = (ctx->size >> 17);
+	// Memory Card filename encoding
+	header->encoding = ((GameID & 0xFF) == 'J');
+	// Generate Header Checksum
+	doChecksum((u16*)header, 0x1FC, &header->chksum1, &header->chksum2);
+
+	// Set Dir Update Counters
+	card_dircntrl *dircntrl1 = (card_dircntrl*)&ctx->base[0x3FC0];
+	card_dircntrl *dircntrl2 = (card_dircntrl*)&ctx->base[0x5FC0];
+	dircntrl1->updated = 0;
+	dircntrl2->updated = 1;
+	// Generate Dir Checksums
+	doChecksum((u16*)&ctx->base[0x2000], 0x1FFC, &dircntrl1->chksum1, &dircntrl1->chksum2);
+	doChecksum((u16*)&ctx->base[0x4000], 0x1FFC, &dircntrl2->chksum1, &dircntrl2->chksum2);
+
+	// Set Block Update Counters
+	card_bat *bat = (card_bat*)&ctx->base[0x6000];
+	bat[0].updated = 0;
+	bat[1].updated = 1;
+	// Set Free Blocks
+	bat[0].freeblocks = (ctx->size / 8192) - 5;
+	bat[1].freeblocks = (ctx->size / 8192) - 5;
+	// Set last allocated Block
+	bat[0].lastalloc = 4;
+	bat[1].lastalloc = 4;
+	// Generate Block Checksums
+	doChecksum((u16*)&ctx->base[0x6004], 0x1FFC, &bat[0].chksum1, &bat[0].chksum2);
+	doChecksum((u16*)&ctx->base[0x8004], 0x1FFC, &bat[1].chksum1, &bat[1].chksum2);
+
+	// Memory card image formatted successfully.
+	sync_after_write(ctx->base, ctx->size);
+	return 0;
 }
 
 /**
@@ -138,19 +225,58 @@ int GCNCard_Load(int slot)
 #ifdef DEBUG_EXI
 		dbgprintf("EXI: Slot %c: Failed to open %s: %u\r\n", (slot+'A'), ctx->filename, ret );
 #endif
-#ifdef GCNCARD_ENABLE_SLOT_B
+		if (ret == FR_OK)
+			f_close(&fd);
+
 		if (slot == 0)
 		{
-			// Slot A failure is fatal.
-			Shutdown();
+			// Slot A failure is usually fatal.
+			// Let's try creating the card image manually.
+			ctx->base = GCNCard_base;
+			ctx->size = ConfigGetMemcardSize();
+			ret = GCNCard_Format(ctx);
+			if (ret != 0)
+			{
+				// Error formatting the memory card.
+				Shutdown();
+			}
+
+			// Attempt to write to the file.
+			ret = f_open_char(&fd, ctx->filename, FA_WRITE|FA_CREATE_ALWAYS);
+			if (ret != FR_OK)
+			{
+				// Cannot open file for writing.
+				// NOW we'll abort.
+				Shutdown();
+			}
+
+			// File opened. Let's write the virtual memory card image.
+			UINT wrote;
+			f_write(&fd, ctx->base, ctx->size, &wrote);
+			f_close(&fd);
+
+			// Make sure we wrote the entire image.
+			if (wrote != ctx->size)
+			{
+				// Wrong size.
+				// Delete the file, then abort.
+				f_unlink_char(ctx->filename);
+				Shutdown();
+			}
+
+			// Memory card image loaded successfully.
+			ctx->BlockOffLow = 0xFFFFFFFF;
+			ctx->BlockOffHigh = 0x00000000;
+
+		#ifdef DEBUG_EXI
+			dbgprintf("EXI: Formatted and Saved Slot %c memory card size %u\r\n", (slot+'A'), ctx->size);
+		#endif
 		}
 
+#ifdef GCNCARD_ENABLE_SLOT_B
 		// Slot B failure will simply disable Slot B.
 		dbgprintf("EXI: Slot %c has been disabled.\r\n", (slot+'A'));
 		return -3;
-#else /* !GCNCARD_ENABLE_SLOT_B */
-		// Slot A failure is fatal.
-		Shutdown();
 #endif /* GCNCARD_ENABLE_SLOT_B */
 	}
 

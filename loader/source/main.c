@@ -34,7 +34,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "Config.h"
 #include "FPad.h"
 #include "menu.h"
-#include "MemCard.h"
 #include "Patches.h"
 #include "kernel_bin.h"
 #include "multidol_ldr_bin.h"
@@ -626,52 +625,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if(ncfg->Config & NIN_CFG_MEMCARDEMU)
-	{
-		// Memory card emulation is enabled.
-		// Set up the memory card file.
-		char BasePath[20];
-		snprintf(BasePath, sizeof(BasePath), "%s:/saves", GetRootDevice());
-		f_mkdir_char(BasePath);
-
-		char MemCardName[8];
-		memset(MemCardName, 0, 8);
-		if ( ncfg->Config & NIN_CFG_MC_MULTI )
-		{
-			// "Multi" mode enabled.
-			// Use one memory card for USA/PAL games,
-			// and another memory card for JPN games.
-			if ((ncfg->GameID & 0xFF) == 'J')  // JPN games
-				memcpy(MemCardName, "ninmemj", 7);
-			else
-				memcpy(MemCardName, "ninmem", 6);
-		}
-		else
-		{
-			// One card per game.
-			memcpy(MemCardName, &(ncfg->GameID), 4);
-		}
-
-		char MemCard[32];
-		snprintf(MemCard, sizeof(MemCard), "%s/%s.raw", BasePath, MemCardName);
-		gprintf("Using %s as Memory Card.\r\n", MemCard);
-		FIL f;
-		if (f_open_char(&f, MemCard, FA_READ|FA_OPEN_EXISTING) != FR_OK)
-		{
-			// Memory card file not found. Create it.
-			if(GenerateMemCard(MemCard) == false)
-			{
-				ClearScreen();
-				ShowMessageScreenAndExit("Failed to create Memory Card File!", 1);
-			}
-		}
-		else
-		{
-			// Memory card file found.
-			f_close(&f);
-		}
-	}
-	else
+	if (!(ncfg->Config & NIN_CFG_MEMCARDEMU))
 	{
 		// Using real memory card slots. (Wii only)
 		// Setup real SRAM language.

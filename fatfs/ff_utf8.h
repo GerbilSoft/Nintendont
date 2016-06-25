@@ -33,6 +33,7 @@ FRESULT f_chdir_char(const char* path);
 
 #if _FS_MINIMIZE <= 1
 FRESULT f_opendir_char(DIR* dp, const char* path);
+FRESULT f_unlink_char(const char *path);
 #endif /* _FS_MINIMIZE <= 1 */
 
 #ifdef __cplusplus
