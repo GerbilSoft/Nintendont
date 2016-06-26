@@ -143,13 +143,7 @@
 /  This option has no effect when _LFN_UNICODE == 0. */
 
 
-#ifdef __PPC__
-// Nintendont loader: Enable relative paths.
 #define _FS_RPATH	1
-#else /* !__PPC__ */
-// Nintendont kernel: Disable relative paths.
-#define _FS_RPATH	0
-#endif /* __PPC__ */
 /* This option configures support of relative path.
 /
 /   0: Disable relative path and remove related functions.

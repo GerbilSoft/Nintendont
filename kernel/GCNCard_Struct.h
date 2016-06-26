@@ -4,6 +4,18 @@
 
 #include "global.h"
 
+/**
+ * Memory card system locations.
+ */
+#define CARD_SYSAREA		5
+#define CARD_SYSDIR		0x2000
+#define CARD_SYSDIR_BACK	0x4000
+#define CARD_SYSBAT		0x6000
+#define CARD_SYSBAT_BACK	0x8000
+
+#define CARD_FILENAMELEN	32      /* Filename length. */
+#define CARD_MAXFILES		127     /* Maximum number of files. */
+
 // Card header.
 typedef struct PACKED _card_header
 {
@@ -21,11 +33,6 @@ typedef struct PACKED _card_header
         u16 chksum1;		// Checksum.
         u16 chksum2;		// Inverted checksum.
 } card_header;
-
-// Memory card directory entry struct.
-// Used by GCI file headers.
-#define CARD_FILENAMELEN 32
-#define CARD_MAXFILES 127
 
 /**
  * Directory control block.
@@ -59,6 +66,15 @@ typedef struct PACKED _card_direntry
 	u16 pad_01;        // Padding. (0xFFFF)
 	u32 commentaddr;   // Comment address.
 } card_direntry;
+
+/**
+ * Directory table.
+ */
+typedef struct PACKED _card_dat
+{
+	struct _card_direntry entries[CARD_MAXFILES];
+	struct _card_dircntrl dircntrl;
+} card_dat;
 
 /**
  * Block allocation table.

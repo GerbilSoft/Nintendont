@@ -15,8 +15,12 @@ extern vu32 TRIGame;
 // Memory Card context.
 static u8 *const GCNCard_base = (u8*)(0x11000000);
 
+// Use GCI Folders instead of card images?
+// TODO: Make this a configurable option.
+static const bool UseGCIFolders = true;
+
 typedef struct _GCNCard_ctx {
-	char filename[0x20];    // Memory Card filename.
+	char filename[0x20];    // Memory Card filename, or directory for GCI folders.
 	u8 *base;               // Base address.
 	u32 size;               // Size, in bytes.
 	u32 code;               // Memory card "code".
@@ -34,6 +38,14 @@ typedef struct _GCNCard_ctx {
 	u32 BlockOffLow;        // Low address of last modification.
 	u32 BlockOffHigh;       // High address of last modification.
 	u32 CARDWriteCount;     // Write count. (TODO: Is this used anywhere?)
+
+	// Filenames for .gci files when using GCI Folders.
+	// Array index corresponds to the index in the directory block.
+	// Filename length is 32 (maximum length on GameCube) plus 7 for
+	// ID6 and hyphen, and 1 extra.
+	// FIXME: Only 4 files for now due to memory limitations.
+	// TODO: Dynamically allocate?
+	char gci_filenames[4][40];
 } GCNCard_ctx;
 #ifdef GCNCARD_ENABLE_SLOT_B
 static GCNCard_ctx memCard[2] __attribute__((aligned(32)));
@@ -143,37 +155,340 @@ static int GCNCard_Format(GCNCard_ctx *ctx)
 	doChecksum((u16*)&ctx->base[0x8004], 0x1FFC, &bat[1].chksum1, &bat[1].chksum2);
 
 	// Memory card image formatted successfully.
-	sync_after_write(ctx->base, ctx->size);
+	// NOTE: Caller must call sync_after_write().
 	return 0;
 }
 
 /**
- * Load a memory card from disk.
- * @param slot Slot number. (0 == Slot A, 1 == Slot B)
- * NOTE: Slot B is not valid on Triforce.
- * @return 0 on success; non-zero on error.
+ * Get the current block table.
+ * @param ctx Memory Card context.
+ * @return Current block table.
  */
-int GCNCard_Load(int slot)
+static inline card_bat *GCNCard_GetCurrentBAT(GCNCard_ctx *const ctx)
 {
-	switch (slot)
+	card_bat *bat = (card_bat*)&ctx->base[CARD_SYSBAT];
+	return (bat[1].updated > bat[0].updated ? &bat[1] : &bat[0]);
+}
+
+/**
+ * Get the current directory table.
+ * @param ctx Memory Card context.
+ * @return Current directory table.
+ */
+static inline card_dat *GCNCard_GetCurrentDAT(GCNCard_ctx *const ctx)
+{
+	card_dat *dat = (card_dat*)&ctx->base[CARD_SYSDIR];
+	return (dat[1].dircntrl.updated > dat[0].dircntrl.updated ? &dat[1] : &dat[0]);
+}
+
+/**
+ * Get the "old" block table.
+ * @param ctx Memory Card context.
+ * @return Old block table.
+ */
+static inline card_bat *GCNCard_GetOldBAT(GCNCard_ctx *const ctx)
+{
+	card_bat *bat = (card_bat*)&ctx->base[CARD_SYSBAT];
+	return (bat[1].updated > bat[0].updated ? &bat[0] : &bat[1]);
+}
+
+/**
+ * Get the "old" directory table.
+ * @param ctx Memory Card context.
+ * @return Old directory table.
+ */
+static inline card_dat *GCNCard_GetOldDAT(GCNCard_ctx *const ctx)
+{
+	card_dat *dat = (card_dat*)&ctx->base[CARD_SYSDIR];
+	return (dat[1].dircntrl.updated > dat[0].dircntrl.updated ? &dat[0] : &dat[1]);
+}
+
+/**
+ * Allocate a block for a GCI file.
+ * @param ctx Memory Card context.
+ * @return Block number, or 0 if a block cannot be allocated.
+ */
+static u16 GCNCard_GCI_AllocBlock(GCNCard_ctx *const ctx)
+{
+	// Get the current block table.
+	card_bat *cur_bat = GCNCard_GetCurrentBAT(ctx);
+
+	// Find an available block.
+	const u16 totalBlocks = (ctx->size / 8192);
+	u16 block;
+	for (block = cur_bat->lastalloc+1; block < totalBlocks; block++)
 	{
-		case 0:
-			// Slot A
-			break;
-#ifdef GCNCARD_ENABLE_SLOT_B
-		case 1:
-			// Slot B (not valid on Triforce)
-			if (TRIGame != 0)
-				return -1;
-			break;
-#endif /* GCNCARD_ENABLE_SLOT_B */
-		default:
-			// Invalid slot.
-			return -2;
+		if (cur_bat->fat[block-5] == 0)
+		{
+			// Found a block.
+			cur_bat->fat[block-5] = 0xFFFF;
+			cur_bat->freeblocks--;
+			cur_bat->lastalloc = block;
+			return (u16)block;
+		}
 	}
 
+	// Couldn't find an available block.
+	// Start again from the beginning of the card.
+	for (block = 5; block <= cur_bat->lastalloc; block++)
+	{
+		if (cur_bat->fat[block-5] == 0)
+		{
+			// Found a block.
+			cur_bat->fat[block-5] = 0xFFFF;
+			cur_bat->freeblocks--;
+			cur_bat->lastalloc = block;
+			return (u16)block;
+		}
+	}
+
+	// No block available.
+	return 0;
+}
+
+/**
+ * Load a GCI file.
+ * NOTE: Must be chdir'd to the game-specific save directory.
+ * @param ctx Memory Card context.
+ * @param filename GCI filename from the game-specific save directory.
+ * @param idx File index. (must be 0 to 127)
+ * @return 0 on success; non-zero on error.
+ */
+static int GCNCard_LoadGCIFile(GCNCard_ctx *const ctx, const char *filename, int idx)
+{
+	// Open the GCI file.
+	FIL fd;
+	int ret = f_open_char(&fd, filename, FA_READ|FA_OPEN_EXISTING);
+	if (ret != FR_OK)
+		return -1;
+
+	// Check the filesize.
+	// Must be a multiple of 8192, plus 64.
+	if (fd.obj.objsize <= 64 || ((fd.obj.objsize - 64) & (8192-1)) != 0)
+		return -2;
+
+	// Get the current block table.
+	card_bat *cur_bat = GCNCard_GetCurrentBAT(ctx);
+
+	// Check if we have enough free blocks.
+	u16 blocks = (fd.obj.objsize - 64) / 8192;
+	if (cur_bat->freeblocks < blocks)
+	{
+		// Not enough free blocks.
+		return -3;
+	}
+
+	// Make sure the specified directory entry is empty.
+	card_dat *cur_dat = GCNCard_GetCurrentDAT(ctx);
+	card_direntry *entry = &cur_dat->entries[idx];
+	static const u8 gamecode_empty[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+	if (memcmp(entry->gamecode, gamecode_empty, sizeof(gamecode_empty)) != 0)
+	{
+		// Directory entry isn't empty.
+		return -4;
+	}
+
+	// Read the GCI header into the directory entry.
+	UINT read;
+	f_lseek(&fd, 0);
+	f_read(&fd, entry, sizeof(*entry), &read);
+	if (read != 64)
+		Shutdown();
+
+	// Make sure the file size is correct
+	entry->length = blocks;
+
+	// Read in the rest of the file, one block at a time.
+	int i;
+	u16 cur_block = 0, new_block;
+	for (i = 0; i < blocks; i++)
+	{
+		// Allocate a block.
+		new_block = GCNCard_GCI_AllocBlock(ctx);
+		if (new_block == 0)
+			Shutdown();
+
+		if (cur_block == 0)
+		{
+			// First block. Update the directory entry.
+			entry->block = new_block;
+		}
+		else
+		{
+			// Not the first block. Update the chain.
+			cur_bat->fat[cur_block-5] = new_block;
+		}
+
+		cur_block = new_block;
+
+		// Load this block from the file.
+		f_read(&fd, &ctx->base[8192 * cur_block], 8192, &read);
+		if (read != 8192)
+			Shutdown();
+	}
+
+	// Save the filename for later.
+	// (Remove the .gci extension.)
+	int len = strlen(filename) - 4;
+	if (len <= 0 || len > 39)
+		Shutdown();
+	strncpy(ctx->gci_filenames[idx], filename, len+1);
+
+	// GCI file loaded.
+	return 0;
+}
+
+/**
+ * Load a GCI folder.
+ * @param slot Slot number. (0 == Slot A, 1 == Slot B)
+ * @return 0 on success; non-zero on error.
+ */
+static int GCNCard_LoadGCIFolder(int slot)
+{
 	// Get the Game ID.
 	const u32 GameID = ConfigGetGameID();
+
+	// Set up the Memory Card context.
+	// NOTE: Do NOT include a trailing slash.
+	// f_mkdir() doesn't like that.
+	GCNCard_ctx *const ctx = &memCard[slot];
+	GCNCard_InitCtx(ctx);
+	memcpy(ctx->filename, "/saves/", 7);
+	memcpy(&ctx->filename[7], &GameID, 4);
+	ctx->filename[11] = 0;
+
+	if (slot != 0)
+	{
+		// Only Slot A is supported for GCI folders right now.
+		Shutdown();
+	}
+
+	// Format the virtual image.
+	ctx->base = GCNCard_base;
+	ctx->size = ConfigGetMemcardSize();
+
+	// Set the code correctly.
+	// 0 = 59-block
+	// 1 = 123-block
+	// 2 = 251-block, etc.
+	ctx->code = MEM_CARD_CODE(ctx->size >> 20);
+
+	int ret = GCNCard_Format(ctx);
+	if (ret != 0)
+	{
+		// Error formatting the memory card.
+		Shutdown();
+	}
+
+	// Make sure the card directory exists.
+	ret = f_mkdir_char("/saves");
+	if (ret != FR_OK && ret != FR_EXIST)
+		Shutdown();
+	ret = f_mkdir_char(ctx->filename);
+	if (ret != FR_OK && ret != FR_EXIST)
+		Shutdown();
+
+	// chdir to the game-specific save directory.
+	ret = f_chdir_char(ctx->filename);
+	if (ret != FR_OK)
+		Shutdown();
+
+	// Read the directory.
+	DIR dp;
+	ret = f_opendir_char(&dp, ctx->filename);
+	if (ret != FR_OK)
+		Shutdown();
+
+	// Find files that end with ".gci".
+	FILINFO fInfo;
+	int idx = 0;	// 0 to 127; GCN filename index.
+	while (idx < 4/*FIXME*/ && f_readdir(&dp, &fInfo) == FR_OK && fInfo.fname[0] != '\0')
+	{
+		// Skip subdirectories.
+		if (fInfo.fattrib & AM_DIR)
+			continue;
+
+		// Skip "." and "..".
+		// This will also skip "hidden" files.
+		if (fInfo.fname[0] == '.')
+			continue;
+
+		// Convert the filename to UTF-8.
+		const char *filename_utf8 = wchar_to_char(fInfo.fname);
+
+		// Check if this filename is valid:
+		// Must be at least 5 characters (".gci" plus name)
+		// Must not be more than 39 characters + ".gci" extension.
+		size_t len = strlen(filename_utf8);
+		if (len > 5 && len < 39+4 &&
+		    !strcmp(&filename_utf8[len-4], ".gci"))
+		{
+			// This is a .gci file.
+			ret = GCNCard_LoadGCIFile(ctx, filename_utf8, idx);
+			// TODO: Error messages?
+			if (ret == 0)
+				idx++;
+		}
+	}
+
+	f_closedir(&dp);
+
+	// Copy the current DAT to the old DAT,
+	// and update checksums.
+	card_dat *cur_dat = GCNCard_GetCurrentDAT(ctx);
+	card_dat *old_dat = GCNCard_GetOldDAT(ctx);
+	memcpy(old_dat, cur_dat, sizeof(*old_dat));
+	cur_dat->dircntrl.updated++;
+	doChecksum((u16*)cur_dat, 0x1FFC, &cur_dat->dircntrl.chksum1, &cur_dat->dircntrl.chksum2);
+	doChecksum((u16*)old_dat, 0x1FFC, &old_dat->dircntrl.chksum1, &old_dat->dircntrl.chksum2);
+
+	// Copy the current BAT to the old BAT,
+	// and update checksums.
+	card_bat *cur_bat = GCNCard_GetCurrentBAT(ctx);
+	card_bat *old_bat = GCNCard_GetOldBAT(ctx);
+	memcpy(old_bat, cur_bat, sizeof(*old_bat));
+	cur_bat->updated++;
+	doChecksum((u16*)cur_bat + 2, 0x1FFC, &cur_bat->chksum1, &cur_bat->chksum2);
+	doChecksum((u16*)old_bat + 2, 0x1FFC, &old_bat->chksum1, &old_bat->chksum2);
+
+	// chdir back to "/".
+	static const WCHAR root_dir[2] = {'/', 0};
+	ret = f_chdir(root_dir);
+	if (ret != FR_OK)
+		Shutdown();
+
+	// Reset the low/high offsets to indicate that everything was just loaded.
+	ctx->BlockOffLow = 0xFFFFFFFF;
+	ctx->BlockOffHigh = 0x00000000;
+
+	// Synchronize the memory card data.
+	sync_after_write(ctx->base, ctx->size);
+
+	// Dump to a test file.
+	UINT wrote;
+	FIL x;
+	f_open_char(&x, "/TEST.raw", FA_WRITE|FA_CREATE_ALWAYS);
+	f_write(&x, ctx->base, ctx->size, &wrote);
+	f_close(&x);
+
+	// GCI folder loaded.
+	return 0;
+}
+
+/**
+ * Load a RAW memory card image.
+ * @param slot Slot number. (0 == Slot A, 1 == Slot B)
+ * @return 0 on success; non-zero on error.
+ */
+static int GCNCard_LoadRAWImage(int slot)
+{
+	// Get the Game ID.
+	const u32 GameID = ConfigGetGameID();
+
+	// Make sure the "/saves/" directory exists.
+	int ret = f_mkdir_char("/saves/");
+	if (ret != FR_OK && ret != FR_EXIST)
+		Shutdown();
 
 	// Set up the Memory Card context.
 	GCNCard_ctx *const ctx = &memCard[slot];
@@ -226,7 +541,7 @@ int GCNCard_Load(int slot)
 
 	dbgprintf("EXI: Trying to open %s\r\n", ctx->filename);
 	FIL fd;
-	int ret = f_open_char(&fd, ctx->filename, FA_READ|FA_OPEN_EXISTING);
+	ret = f_open_char(&fd, ctx->filename, FA_READ|FA_OPEN_EXISTING);
 	if (ret != FR_OK || fd.obj.objsize == 0)
 	{
 #ifdef DEBUG_EXI
@@ -275,6 +590,7 @@ int GCNCard_Load(int slot)
 			// Memory card image loaded successfully.
 			ctx->BlockOffLow = 0xFFFFFFFF;
 			ctx->BlockOffHigh = 0x00000000;
+			sync_after_write(ctx->base, ctx->size);
 
 		#ifdef DEBUG_EXI
 			dbgprintf("EXI: Formatted and Saved Slot %c memory card size %u\r\n", (slot+'A'), ctx->size);
@@ -367,10 +683,6 @@ int GCNCard_Load(int slot)
 	ctx->BlockOffLow = 0xFFFFFFFF;
 	ctx->BlockOffHigh = 0x00000000;
 
-#ifdef DEBUG_EXI
-	dbgprintf("EXI: Loaded Slot %c memory card size %u\r\n", (slot+'A'), ctx->size);
-#endif
-
 	// Synchronize the memory card data.
 	sync_after_write(ctx->base, ctx->size);
 
@@ -381,7 +693,48 @@ int GCNCard_Load(int slot)
 		ncfg->Config |= NIN_CFG_MC_SLOTB;
 	}
 #endif /* GCNCARD_ENABLE_SLOT_B */
+}
 
+/**
+ * Load a memory card from disk.
+ * @param slot Slot number. (0 == Slot A, 1 == Slot B)
+ * NOTE: Slot B is not valid on Triforce.
+ * @return 0 on success; non-zero on error.
+ */
+int GCNCard_Load(int slot)
+{
+	switch (slot)
+	{
+		case 0:
+			// Slot A
+			break;
+#ifdef GCNCARD_ENABLE_SLOT_B
+		case 1:
+			// Slot B (not valid on Triforce)
+			if (TRIGame != 0)
+				return -1;
+			break;
+#endif /* GCNCARD_ENABLE_SLOT_B */
+		default:
+			// Invalid slot.
+			return -2;
+	}
+
+	int ret;
+	if (UseGCIFolders)
+		ret = GCNCard_LoadGCIFolder(slot);
+	else
+		ret = GCNCard_LoadRAWImage(slot);
+
+	if (ret != 0)
+	{
+		// Error loading the memory card.
+		return -3;
+	}
+
+#ifdef DEBUG_EXI
+	dbgprintf("EXI: Loaded Slot %c memory card size %u\r\n", (slot+'A'), ctx->size);
+#endif
 	return 0;
 }
 
@@ -423,6 +776,12 @@ bool GCNCard_CheckChanges(void)
 */
 void GCNCard_Save(void)
 {
+	if (UseGCIFolders)
+	{
+		// FIXME: Not supported yet.
+		return;
+	}
+
 	if (TRIGame)
 	{
 		// Triforce doesn't use the standard EXI CARD interface.
