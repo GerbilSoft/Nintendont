@@ -464,13 +464,6 @@ static int GCNCard_LoadGCIFolder(int slot)
 	// Synchronize the memory card data.
 	sync_after_write(ctx->base, ctx->size);
 
-	// Dump to a test file.
-	UINT wrote;
-	FIL x;
-	f_open_char(&x, "/TEST.raw", FA_WRITE|FA_CREATE_ALWAYS);
-	f_write(&x, ctx->base, ctx->size, &wrote);
-	f_close(&x);
-
 	// GCI folder loaded.
 	return 0;
 }
