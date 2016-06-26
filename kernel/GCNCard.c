@@ -241,6 +241,7 @@ int GCNCard_Load(int slot)
 			// Let's try creating the card image manually.
 			ctx->base = GCNCard_base;
 			ctx->size = ConfigGetMemcardSize();
+			ctx->code = MEM_CARD_CODE(ctx->size >> 20);
 			ret = GCNCard_Format(ctx);
 			if (ret != 0)
 			{
@@ -278,6 +279,7 @@ int GCNCard_Load(int slot)
 		#ifdef DEBUG_EXI
 			dbgprintf("EXI: Formatted and Saved Slot %c memory card size %u\r\n", (slot+'A'), ctx->size);
 		#endif
+			return 0;
 		}
 
 #ifdef GCNCARD_ENABLE_SLOT_B

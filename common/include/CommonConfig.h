@@ -156,8 +156,8 @@ enum VideoModes
 //Mem1019 = 4, 0x40, 0x0800000
 //Mem2043 = 5, 0x80, 0x1000000
 #define MEM_CARD_MAX (5)
-#define MEM_CARD_CODE(x) (1<<(x+2))
-#define MEM_CARD_SIZE(x) (1<<(x+19))
-#define MEM_CARD_BLOCKS(x) ((1<<(x+6))-5)
+#define MEM_CARD_CODE(x) (1<<((x)+2))
+#define MEM_CARD_SIZE(x) (1<<((x)+19))
+#define MEM_CARD_BLOCKS(x) ((1<<((x)+6))-5)
 
 #endif
