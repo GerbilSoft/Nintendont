@@ -40,12 +40,14 @@ typedef struct _GCNCard_ctx {
 	u32 CARDWriteCount;     // Write count. (TODO: Is this used anywhere?)
 
 	// Filenames for .gci files when using GCI Folders.
-	// Array index corresponds to the index in the directory block.
-	// Filename length is 32 (maximum length on GameCube) plus 7 for
-	// ID6 and hyphen, and 1 extra.
+	// Virtual array of [127][40]:
+	// - idx0: Index in the directory block.
+	// - idx1: Filename length is 32 (maximum length on GameCube)
+	//         plus 7 for ID6 and hyphen, and 1 extra.
 	// FIXME: Only 4 files for now due to memory limitations.
 	// TODO: Dynamically allocate?
-	char gci_filenames[4][40];
+	#define GCI_FILENAME_LEN 40
+	char *gci_filenames;
 } GCNCard_ctx;
 #ifdef GCNCARD_ENABLE_SLOT_B
 static GCNCard_ctx memCard[2] __attribute__((aligned(32)));
@@ -55,10 +57,23 @@ static GCNCard_ctx memCard[1] __attribute__((aligned(32)));
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 
-static void GCNCard_InitCtx(GCNCard_ctx *ctx)
+static void GCNCard_InitCtx(GCNCard_ctx *const ctx)
 {
 	memset(ctx, 0, sizeof(*ctx));
 	ctx->BlockOffLow = 0xFFFFFFFF;
+}
+
+/**
+ * Get a pointer to a filename within gcn_filenames.
+ * @param ctx Memory Card context.
+ * @param idx Filename index.
+ * @return Filename pointer.
+ */
+static inline char *GciFilenamePtr(GCNCard_ctx *const ctx, int idx)
+{
+	if (!ctx->gci_filenames)
+		return NULL;
+	return ctx->gci_filenames + (idx * GCI_FILENAME_LEN);
 }
 
 /**
@@ -332,7 +347,7 @@ static int GCNCard_LoadGCIFile(GCNCard_ctx *const ctx, const char *filename, int
 	int len = strlen(filename) - 4;
 	if (len <= 0 || len > 39)
 		Shutdown();
-	strncpy(ctx->gci_filenames[idx], filename, len+1);
+	strncpy(GciFilenamePtr(ctx, idx), filename, len+1);
 
 	// GCI file loaded.
 	return 0;
@@ -356,6 +371,14 @@ static int GCNCard_LoadGCIFolder(int slot)
 	memcpy(ctx->filename, "/saves/", 7);
 	memcpy(&ctx->filename[7], &GameID, 4);
 	ctx->filename[11] = 0;
+
+	// Allocate the GCI filename array.
+	ctx->gci_filenames = malloca(CARD_MAXFILES * GCI_FILENAME_LEN, 32);
+	if (!ctx->gci_filenames)
+	{
+		// Can't allocate memory!
+		Shutdown();
+	}
 
 	if (slot != 0)
 	{
@@ -402,7 +425,7 @@ static int GCNCard_LoadGCIFolder(int slot)
 	// Find files that end with ".gci".
 	FILINFO fInfo;
 	int idx = 0;	// 0 to 127; GCN filename index.
-	while (idx < 4/*FIXME*/ && f_readdir(&dp, &fInfo) == FR_OK && fInfo.fname[0] != '\0')
+	while (idx < CARD_MAXFILES && f_readdir(&dp, &fInfo) == FR_OK && fInfo.fname[0] != '\0')
 	{
 		// Skip subdirectories.
 		if (fInfo.fattrib & AM_DIR)
@@ -420,7 +443,7 @@ static int GCNCard_LoadGCIFolder(int slot)
 		// Must be at least 5 characters (".gci" plus name)
 		// Must not be more than 39 characters + ".gci" extension.
 		size_t len = strlen(filename_utf8);
-		if (len > 5 && len < 39+4 &&
+		if (len > 5 && len < GCI_FILENAME_LEN-1+4 &&
 		    !strcmp(&filename_utf8[len-4], ".gci"))
 		{
 			// This is a .gci file.
