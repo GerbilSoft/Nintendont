@@ -1,7 +1,8 @@
 // Nintendont: FatFs UTF-8 wrapper functions.
 #include "ff_utf8.h"
-#include <stdlib.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 
 // Temporary WCHAR buffer.
 // NOT REENTRANT OR THREAD-SAFE!
@@ -86,14 +87,34 @@ FRESULT f_mount_char(FATFS* fs, const char* path, BYTE opt)
 	return f_mount(fs, tmpwchar.u16, opt);
 }
 
-#if !_FS_READONLY
+#if !_FS_READONLY && _FS_MINIMIZE < 1
 FRESULT f_mkdir_char(const char* path)
 {
 	if (!char_to_wchar(path))
 		return FR_INVALID_NAME;
 	return f_mkdir(tmpwchar.u16);
 }
-#endif /* !_FS_READONLY */
+
+FRESULT f_unlink_char(const char* path)
+{
+	if (!char_to_wchar(path))
+		return FR_INVALID_NAME;
+	return f_unlink(tmpwchar.u16);
+}
+
+FRESULT f_rename_char(const char* path_old, const char *path_new)
+{
+	WCHAR wpath_old[1024];
+	if (!char_to_wchar(path_old))
+		return FR_INVALID_NAME;
+	// TODO: Optimize this.
+	memcpy(wpath_old, tmpwchar.u16, sizeof(wpath_old));
+
+	if (!char_to_wchar(path_new))
+		return FR_INVALID_NAME;
+	return f_rename(wpath_old, tmpwchar.u16);
+}
+#endif /* !_FS_READONLY && _FS_MINIMIZE < 1 */
 
 #if _FS_RPATH >= 1
 #if _VOLUMES >= 2
