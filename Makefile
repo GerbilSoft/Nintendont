@@ -11,8 +11,15 @@ ifeq ($(strip $(DEVKITARM)),)
 $(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
 endif
 
+ifeq ($(USE_LIBCUSTOMFAT),1)
+PPC_FAT_LIBRARY := libcustomfat/libogc/lib/wii/libfat.a
+else
+PPC_FAT_LIBRARY := fatfs/libfat-ppc.a
+endif
+
 SUBPROJECTS := multidol kernel/asm resetstub \
 	fatfs/libfat-arm.a fatfs/libfat-ppc.a \
+	libcustomfat/libogc/lib/wii/libfat.a \
 	codehandler kernel \
 	loader/source/ppc loader
 .PHONY: all forced clean $(SUBPROJECTS)
@@ -50,6 +57,12 @@ fatfs/libfat-ppc.a:
 	@echo " "
 	$(MAKE) -C fatfs -f Makefile.ppc
 
+libcustomfat/libogc/lib/wii/libfat.a:
+	@echo " "
+	@echo "Building libcustomfat library for PPC"
+	@echo " "
+	$(MAKE) -C libcustomfat wii-release
+
 codehandler:
 	@echo " "
 	@echo "Building Nintendont code handler"
@@ -68,11 +81,11 @@ loader/source/ppc:
 	@echo " "
 	$(MAKE) -C loader/source/ppc
 
-loader: multidol resetstub fatfs/libfat-ppc.a kernel loader/source/ppc
+loader: multidol resetstub $(PPC_FAT_LIBRARY) kernel loader/source/ppc
 	@echo " "
 	@echo "Building Nintendont loader"
 	@echo " "
-	$(MAKE) -C loader
+	$(MAKE) -C loader USE_LIBCUSTOMFAT=$(USE_LIBCUSTOMFAT)
 
 clean:
 	@echo " "
@@ -83,6 +96,7 @@ clean:
 	$(MAKE) -C resetstub clean
 	$(MAKE) -C fatfs -f Makefile.arm clean
 	$(MAKE) -C fatfs -f Makefile.ppc clean
+	$(MAKE) -C libcustomfat clean
 	$(MAKE) -C codehandler clean
 	$(MAKE) -C kernel clean
 	$(MAKE) -C loader/source/ppc clean
