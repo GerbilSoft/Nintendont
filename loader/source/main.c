@@ -271,7 +271,6 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 		if (read != 48)
 		{
 			// Could not read bi2.bin.
-			f_close(&f);
 			free(MultiHdr);
 			return -3;
 		}
