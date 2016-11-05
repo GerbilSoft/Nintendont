@@ -18,7 +18,7 @@
 
 extern DISC_INTERFACE __io_wiisd;
 extern DISC_INTERFACE __io_custom_usbstorage;
-DISC_INTERFACE *driver[_VOLUMES] = { &__io_wiisd, &__io_custom_usbstorage };
+static const DISC_INTERFACE *const driver[_VOLUMES] = { &__io_wiisd, &__io_custom_usbstorage };
 static bool disk_isInit[_VOLUMES] = {0};
 
 /* simple but very effective sector cache */

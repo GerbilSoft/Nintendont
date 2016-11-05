@@ -2,38 +2,26 @@
 // Based on libcustomfat's devoptab.
 #include <sys/iosupport.h>
 #include "ff_utf8.h"
+#include "diskio.h"
 
 // C includes.
 #define __LINUX_ERRNO_EXTENSIONS__
 #include <errno.h>
 #include <fcntl.h>
+#include <malloc.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
 // Devices.
 #include <sdcard/wiisd_io.h>
 
-static const DISC_INTERFACE* get_io_wiisd (void) {
-	return &__io_wiisd;
-}
-
-extern DISC_INTERFACE __io_custom_usbstorage;
-static const DISC_INTERFACE* get_io_usbstorage (void) {
-	return &__io_custom_usbstorage;
-}
-
-// Disc interfaces.
-typedef struct {
-        const char* name; 
-        const DISC_INTERFACE* (*getInterface)(void);
-} INTERFACE_ID;
-const INTERFACE_ID _FF_disc_interfaces[] = {
-	{"sd", get_io_wiisd},
-	{"usb", get_io_usbstorage},
-	{NULL, NULL}
-};	
-
+/**
+ * Convert FatFS FRESULT to errno.
+ * @param res FatFS FRESULT.
+ * @return errno
+ */
 static int FRESULT_to_errno(FRESULT res)
 {
 	switch (res) {
@@ -431,7 +419,7 @@ static int _FF_fsync_r(struct _reent *r, int fd)
 #endif
 }
 
-static const devoptab_t dotab_FF = {
+static const devoptab_t dotab_ff = {
 	"fat",
 	sizeof(FIL),
 	_FF_open_r,
@@ -459,3 +447,178 @@ static const devoptab_t dotab_FF = {
 	NULL,	// fchmod_r
 	NULL	// rmdir_r
 };
+
+/** devoptab interface **/
+
+/** Device mount/unmount. **/
+// 0 == SD, 1 == USB
+static FATFS *devices[2] = {NULL, NULL};
+
+// Device initialization data.
+typedef struct _devInitInfo_t
+{
+	const WCHAR devNameFF[8];
+	const char devNameDisplay[4];
+
+	// Maximum init timeout, in seconds.
+	// (0 = only try once)
+	int timeout;
+} devInitInfo_t;
+
+static const devInitInfo_t devInitInfo[2] =
+{
+	{{'s', 'd', ':', 0}, "SD", 0},
+	{{'u', 's', 'b', ':', 0}, "USB", 10}
+};
+
+/**
+ * Initiailize a FatFS device.
+ * @param pdrv Device number.
+ * @return 0 on success; non-zero on error.
+ */
+static int ff_init_device(BYTE pdrv)
+{
+	if (pdrv < DEV_SD || pdrv > DEV_USB)
+		return -1;
+
+	if (devices[pdrv] != NULL)
+	{
+		// Device is already initialized.
+		return 0;
+	}
+
+	// Check if this device already exists.
+	static const char devop_name[2][4] = {"sd", "usb"};
+	char devname[10];
+	strcpy(devname, devop_name[pdrv]);
+	strcat(devname, ":");
+	if (FindDevice(devname) >= 0)
+	{
+		// Device is already initialized.
+		return 0;
+	}
+
+	// Initialize the devoptab entry.
+	// Based on libcustomfat's fatMount().
+	devoptab_t *devops = malloc(sizeof(devoptab_t) + strlen(devname) + 1);
+	if (!devops)
+	{
+		// Cannot allocate memory.
+		return -2;
+	}
+	memcpy(devops, &dotab_ff, sizeof(devoptab_t));
+	char *nameCopy = (char*)(devops + 1);
+	strcpy(nameCopy, devop_name[pdrv]);
+	devops->name = nameCopy;
+
+	// Attempt to initialize this device
+	// TODO: Do initialization asynchronously.
+	if (devInitInfo[pdrv].timeout > 0)
+	{
+		// Attempt multiple inits within a timeout period.
+		time_t timeout = time(NULL);
+		while (time(NULL) - timeout < devInitInfo[pdrv].timeout)
+		{
+			if (disk_initialize(pdrv) == 0)
+				break;
+			usleep(50000);
+		}
+	}
+	else
+	{
+		// Only attempt a single init.
+		disk_initialize(pdrv);
+	}
+
+	if (disk_status(pdrv) != 0)
+	{
+		// Error initializing the device.
+		free(devops);
+		return -3;
+	}
+
+	// Device initialized.
+	devices[pdrv] = (FATFS*)memalign(32, sizeof(FATFS));
+	if (f_mount(devices[pdrv], devInitInfo[pdrv].devNameFF, 1) != FR_OK)
+	{
+		// Error mounting the filesystem.
+		free(devices[pdrv]);
+		devices[pdrv] = NULL;
+		free(devops);
+		return -4;
+	}
+
+	devops->deviceData = devices[pdrv];
+	AddDevice(devops);
+	return 0;
+}
+
+/**
+ * Initialize and mount all devices
+ */
+void ffInit(void)
+{
+	int defaultDevice = -1;
+	BYTE pdrv;
+	for (pdrv = 0; pdrv < 2; pdrv++)
+	{
+		int ret = ff_init_device(pdrv);
+		if (ret == 0 && defaultDevice < 0)
+			defaultDevice = pdrv;
+	}
+
+	// Set the default device.
+	// TODO: argv modifications like fatInitSimple().
+	if (defaultDevice >= DEV_SD && defaultDevice <= DEV_USB)
+	{
+		static const WCHAR root_dir[] = {'/', 0};
+		f_chdrive(devInitInfo[defaultDevice].devNameFF);
+		f_chdir(root_dir);
+	}
+}
+
+/**
+ * Unmount and shut down a device.
+ * @param name Device name.
+ */
+void ffUnmount(const char *name)
+{
+	// Based on libcustomfat's fatUnmount().
+	if (!name)
+		return;
+
+	// Convert the device name to a FatFS drive number.
+	BYTE pdrv;
+	if (strcasecmp(name, "sd")) {
+		pdrv = DEV_SD;
+	} else if (strcasecmp(name, "usb")) {
+		pdrv = DEV_USB;
+	} else {
+		// Not supported.
+		return;
+	}
+
+	devoptab_t *devops = (devoptab_t*)GetDeviceOpTab(name);
+	if (!devops)
+		return;
+
+	// Make sure this is actually a FatFS device.
+	if (devops->open_r != _FF_open_r)
+		return;
+
+	// Remove the device from devoptab.
+	if (RemoveDevice(name) == -1)
+		return;
+
+	// Check if the device is mounted.
+	if (devices[pdrv] != NULL) {
+		// Unmount the device.
+		f_mount(NULL, devInitInfo[pdrv].devNameFF, 1);
+		// Free the FatFS object.
+		free(devices[pdrv]);
+		devices[pdrv] = NULL;
+	}
+
+	// Shut down the device driver.
+	disk_shutdown(pdrv);
+}

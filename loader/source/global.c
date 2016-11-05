@@ -32,8 +32,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <stdio.h>
 #include <unistd.h>
 
-#include "ff_utf8.h"
-#include "diskio.h"
+#ifdef USE_LIBCUSTOMFAT
+#include <fat.h>
+#else
+#include "ff_devoptab.h"
+#endif
 
 #include "Config.h"
 #include "exi.h"
@@ -306,14 +309,14 @@ void ExitToLoader(int ret)
 bool LoadNinCFG(void)
 {
 	bool ConfigLoaded = true;
-	FIL cfg;
-	if (f_open_char(&cfg, "/nincfg.bin", FA_READ|FA_OPEN_EXISTING) != FR_OK)
+	// FIXME: Default drive?
+	FILE *cfg = fopen("/nincfg.bin", "rb+");
+	if (!cfg)
 		return false;
 
 	// Read the configuration file into memory.
-	UINT BytesRead;
-	f_read(&cfg, ncfg, sizeof(NIN_CFG), &BytesRead);
-	f_close(&cfg);
+	size_t BytesRead = fread(ncfg, 1, sizeof(NIN_CFG), cfg);
+	fclose(cfg);
 
 	switch( ncfg->Version ) {
 		case 2:
@@ -432,16 +435,15 @@ void UpdateNinCFG()
 
 int CreateNewFile(const char *Path, u32 size)
 {
-	FIL f;
-
-	// Check if the file already exists.
-	if (f_open_char(&f, Path, FA_READ|FA_OPEN_EXISTING) == FR_OK)
+	FILE *f = fopen(Path, "rb");
+	if (f != NULL)
 	{	//create ONLY new files
-		f_close(&f);
+		fclose(f);
 		return -1;
 	}
 
-	if (f_open_char(&f, Path, FA_WRITE|FA_CREATE_NEW) != FR_OK)
+	f = fopen(Path, "wb");
+	if (!f)
 	{
 		gprintf("Failed to create %s!\r\n", Path);
 		return -2;
@@ -449,115 +451,32 @@ int CreateNewFile(const char *Path, u32 size)
 
 	// Allocate a temporary buffer.
 	void *buf = calloc(size, 1);
-	if(buf == NULL)
+	if (!buf)
 	{
 		gprintf("Failed to allocate %u bytes!\r\n", size);
 		return -3;
 	}
 
 	// Write the temporary buffer to disk.
-	UINT wrote;
-	f_write(&f, buf, size, &wrote);
-	f_close(&f);
+	size_t wrote = fwrite(buf, 1, size, f);
+	fclose(f);
 	free(buf);
 	gprintf("Created %s with %u bytes!\r\n", Path, wrote);
 	return 0;
 }
 
-/** Device mount/unmount. **/
-// 0 == SD, 1 == USB
-FATFS *devices[2];
-
-// Device initialization data.
-typedef struct _devInitInfo_t
-{
-	const WCHAR devNameFF[8];
-	const char devNameDisplay[4];
-
-	// Maximum init timeout, in seconds.
-	// (0 = only try once)
-	int timeout;
-} devInitInfo_t;
-
-static const devInitInfo_t devInitInfo[2] =
-{
-	{{'s', 'd', ':', 0}, "SD", 0},
-	{{'u', 's', 'b', ':', 0}, "USB", 10}
-};
-
 /**
- * Initialize and mount a device.
- * @param pdrv Device number.
- * @return Mount point (WCHAR), or NULL on error.
+ * Mount all devices.
  */
-const WCHAR *MountDevice(BYTE pdrv)
+void MountDevices(void)
 {
-	if (pdrv < DEV_SD || pdrv > DEV_USB)
-		return NULL;
-
-	// Attempt to initialize this device
-	// TODO: Do initialization asynchronously.
-	if (devInitInfo[pdrv].timeout > 0)
-	{
-		// Attempt multiple inits within a timeout period.
-		time_t timeout = time(NULL);
-		while (time(NULL) - timeout < devInitInfo[pdrv].timeout)
-		{
-			if (disk_initialize(pdrv) == 0)
-				break;
-			usleep(50000);
-		}
-	}
-	else
-	{
-		// Only attempt a single init.
-		disk_initialize(pdrv);
-	}
-
-	if (disk_status(pdrv) == 0)
-	{
-		// Device initialized.
-		devices[pdrv] = (FATFS*)memalign(32, sizeof(FATFS));
-		if (f_mount(devices[pdrv], devInitInfo[pdrv].devNameFF, 1) == FR_OK)
-		{
-			gprintf("Mounted %s!\n", devInitInfo[pdrv].devNameDisplay);
-		}
-		else
-		{
-			// Could not mount the filesystem.
-			free(devices[pdrv]);
-			devices[pdrv] = NULL;
-		}
-	}
-
-	return (devices[pdrv] ? devInitInfo[pdrv].devNameFF : NULL);
-}
-
-/**
- * Unmount and shut down a device.
- * @param pdrv Device number.
- * @return 0 on success or if the drive was already shut down; non-zero on error.
- */
-int UnmountDevice(BYTE pdrv)
-{
-	if (pdrv < DEV_SD || pdrv > DEV_USB)
-		return -1;
-
-	// FIXME: Close the log file if it's on this device?
-
-	// Check if the device is mounted.
-	if (devices[pdrv] != NULL)
-	{
-		// Unmount the device.
-		f_mount(NULL, devInitInfo[pdrv].devNameFF, 1);
-		// Free the FatFS object.
-		free(devices[pdrv]);
-		devices[pdrv] = 0;
-	}
-
-	// Shut down the device driver.
-	disk_shutdown(pdrv);
-	return 0;
+#ifdef USE_LIBCUSTOMFAT
+	// libcustomfat
+	fatInitDefault();
+#else
+	// FatFS
+	ffInit();
+#endif
 }
 
 /**
@@ -566,13 +485,16 @@ int UnmountDevice(BYTE pdrv)
  */
 void CloseDevices(void)
 {
-	int i;
-
 	closeLog();
-	for (i = DEV_SD; i <= DEV_USB; i++)
-	{
-		UnmountDevice(i);
-	}
+#ifdef USE_LIBCUSTOMFAT
+	// libcustomfat
+	fatUnmount("sd");
+	fatUnmount("usb");
+#else
+	// FatFS
+	ffUnmount("sd");
+	ffUnmount("usb");
+#endif
 }
 
 /**

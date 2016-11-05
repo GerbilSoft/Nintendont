@@ -2,7 +2,6 @@
 #include <gccore.h>
 #include "exi.h"
 #include "HID.h"
-#include "ff_utf8.h"
 
 #define HID_STATUS 0xD3003440
 #define HID_CHANGE (HID_STATUS+4)
@@ -34,22 +33,22 @@ void HIDUpdateRegisters()
 	};
 
 	int i;
-	FIL f;
-	FRESULT res = FR_DISK_ERR;
+	FILE *f = NULL;
 	for (i = 0; i < 6; i++)
 	{
-		res = f_open_char(&f, filenames[i], FA_READ|FA_OPEN_EXISTING);
-		if (res == FR_OK)
+		f = fopen(filenames[i], "rb");
+		if (f != NULL)
 			break;
 	}
 
-	if (res == FR_OK)
+	if (f != NULL)
 	{
-		size_t fsize = f.obj.objsize;
-		UINT read;
-		f_read(&f, (void*)HID_CFG_FILE, fsize, &read);
+		fseek(f, 0, SEEK_END);
+		long fsize = ftell(f);
+		fseek(f, 0, SEEK_SET);
+		fread((void*)HID_CFG_FILE, 1, fsize, f);
 		DCFlushRange((void*)HID_CFG_FILE, fsize);
-		f_close(&f);
+		fclose(f);
 		*(vu32*)HID_CFG_SIZE = fsize;
 	}
 	else

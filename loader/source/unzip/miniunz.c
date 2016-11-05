@@ -16,7 +16,6 @@
 # include <utime.h>
 
 #include "unzip.h"
-#include "ff_utf8.h"
 
 #define CASESENSITIVITY (0)
 #define WRITEBUFFERSIZE (8192)
@@ -24,8 +23,7 @@
 
 static int mymkdir(const char* dirname)
 {
-    int ret = f_mkdir_char(dirname);
-    return (ret == FR_OK || ret == FR_EXIST);
+    return mkdir(dirname, 0777);
 }
 
 int makedir (char *newdir)
@@ -78,10 +76,10 @@ static int do_extract_currentfile(unzFile uf,const int* popt_extract_without_pat
     char* filename_withoutpath;
     char* p;
     int err=UNZ_OK;
-    int res=FR_NO_FILE;
+    FILE *fout=NULL;
     void* buf;
     uInt size_buf;
-	FIL f;
+
     unz_file_info file_info;
     err = unzGetCurrentFileInfo(uf,&file_info,filename_inzip,sizeof(filename_inzip),NULL,0,NULL,0);
 
@@ -133,26 +131,26 @@ static int do_extract_currentfile(unzFile uf,const int* popt_extract_without_pat
 
         if ((skip==0) && (err==UNZ_OK))
         {
-            res = f_open_char(&f,write_filename,FA_WRITE|FA_CREATE_ALWAYS);
+            fout=fopen(write_filename,"wb");
 
             /* some zipfile don't contain directory alone before file */
-            if ((res != FR_OK) && ((*popt_extract_without_path)==0) &&
+            if ((fout==NULL) && ((*popt_extract_without_path)==0) &&
                                 (filename_withoutpath!=(char*)filename_inzip))
             {
                 char c=*(filename_withoutpath-1);
                 *(filename_withoutpath-1)='\0';
                 makedir(write_filename);
                 *(filename_withoutpath-1)=c;
-                res = f_open_char(&f,write_filename,FA_WRITE|FA_CREATE_ALWAYS);
+                fout=fopen(write_filename,"wb");
             }
 
-            if (res != FR_OK)
+            if (fout==NULL)
             {
                 printf("error opening %s\n",write_filename);
             }
         }
 
-        if (res == FR_OK)
+        if (fout!=NULL)
         {
             printf(" extracting: %s\n",write_filename);
 
@@ -166,8 +164,7 @@ static int do_extract_currentfile(unzFile uf,const int* popt_extract_without_pat
                 }
                 if (err>0)
 				{
-					UINT wrote;
-                    if (f_write(&f,buf,err,&wrote)!=FR_OK)
+                    if (fwrite(buf,err,1,fout)!=1)
                     {
                         printf("error in writing extracted file\n");
                         err=UNZ_ERRNO;
@@ -176,12 +173,9 @@ static int do_extract_currentfile(unzFile uf,const int* popt_extract_without_pat
 				}
             }
             while (err>0);
-            if (res == FR_OK)
-			{
-				f_close(&f);
-				res = FR_NO_FILE;
-			}
-		}
+            if (fout)
+		    fclose(fout);
+	}
 
         if (err==UNZ_OK)
         {

@@ -18,7 +18,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 #include "global.h"
 #include "exi.h"
-#include "ff_utf8.h"
 #include "menu.h"
 #include "font.h"
 
@@ -98,18 +97,18 @@ bool GenerateMemCard(const char *MemCard, u32 BI2region)
 	if (!MemCard || MemCard[0] == 0)
 		return false;
 
-	FIL f;
-	if (f_open_char(&f, MemCard, FA_WRITE|FA_CREATE_NEW) != FR_OK)
+	FILE *f = fopen(MemCard, "wb");
+	if (!f)
 		return false;
 
 	// Get memory to format. (8 block window)
-	u8 *MemcardBase = memalign(32, 0x10000);
+	u8 *MemcardBase = memalign(32, 8*8192);
 	// Fill Header and Dir Memory with 0xFF.
-	memset(MemcardBase, 0xFF, 0x6000);
+	memset(MemcardBase, 0xFF, 3*8192);
 	// Fill the Block table with 0x00.
-	memset(&MemcardBase[0x6000], 0x00, 0x4000);
+	memset(&MemcardBase[0x6000], 0x00, 2*8192);
 	// Clear the initial data area.
-	memset(&MemcardBase[0xA000], 0x00, 0x6000);
+	memset(&MemcardBase[0xA000], 0x00, 3*8192);
 
 	// Header block.
 	card_header *header = (card_header*)MemcardBase;
@@ -170,27 +169,22 @@ bool GenerateMemCard(const char *MemCard, u32 BI2region)
 
 	const u32 total_size = MEM_CARD_SIZE(ncfg->MemCardBlocks);
 
-	// Reserve space in the memory card file.
-	// FIXME: This seems to make it slower...
-	//f_expand(&f, total_size, 1);
-
 	// Write the header (5 blocks) and initial data area
 	// (3 blocks) to the file.
-	// FIXME: Initial write and second write seem to be slow.
-	UINT wrote;
+	// FIXME: [FatFS] Initial write and second write seem to be slow.
 	showProgress(0, total_size);
-	f_write(&f, MemcardBase, 0x10000, &wrote);
+	fwrite(MemcardBase, 1, 8*8192, f);
 
 	// Write the remaining blocks.
 	u32 i;
-	for (i = 0x10000; i < total_size; i += 0x10000)
+	for (i = 8*8192; i < total_size; i += 8*8192)
 	{
 		showProgress(i, total_size);
-		f_write(&f, MemcardBase, 0x10000, &wrote);
+		fwrite(MemcardBase, 1, 8*8192, f);
 	}
 	showProgress(total_size, total_size);
 
-	f_close(&f);
+	fclose(f);
 	free(MemcardBase);
 	gprintf("Memory Card File created!\r\n");
 	return true;

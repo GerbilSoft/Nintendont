@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <unistd.h>
 #include <malloc.h>
 #include <network.h>
+#include <sys/stat.h>
 #include <zlib.h>
 #include <ogc/lwp_watchdog.h>
 
@@ -39,7 +40,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "update.h"
 #include "../../common/include/NintendontVersion.h"
 
-#include "ff_utf8.h"
 #include "unzip/miniunz.h"
 #include "unzip/ioapi.h"
 
@@ -66,33 +66,42 @@ static const downloads_t Downloads[] = {
 	{"https://raw.githubusercontent.com/FIX94/Nintendont/master/common/include/NintendontVersion.h", "Checking Latest Version", "", 0x400} // 1KB
 };
 
-extern void changeToDefaultDrive();
 static int UnzipControllers(const void *buf, size_t fSize) {
 	char filepath[20];
 	snprintf(filepath,20,"%x+%x",(u32)buf,(u32)fSize);
-	static const char *unzip_directory = "/controllers";
 	unzFile uf = unzOpen(filepath);
 	if (!uf) {
 		gprintf("Cannot open %s, aborting\r\n", Downloads[DOWNLOAD_CONTROLLERS].filename);
 		return -1;
 	}
 	gprintf("%s opened\n", Downloads[DOWNLOAD_CONTROLLERS].filename);
-	f_chdrive_char(UseSD ? "sd:" : "usb:");
-	f_mkdir_char(unzip_directory); // attempt to make dir
-	if (f_chdir_char(unzip_directory) != FR_OK) {
-		gprintf("Error changing into %s, aborting\r\n", unzip_directory);
+
+	// Get the current working directory.
+	char prev_cwd[256];
+	if (!getcwd(prev_cwd, sizeof(prev_cwd))) {
+		gprintf("Error calling getcwd(), aborting\r\n");
 		return -2;
+	}
+
+	char unzip_path[32];
+	snprintf(unzip_path, sizeof(unzip_path), "%s:/controllers", (UseSD ? "sd" : "usb"));
+	mkdir(unzip_path, 0777); // attempt to make dir
+	if (chdir(unzip_path) != 0) {
+		gprintf("Error changing into %s, aborting\r\n", unzip_path);
+		return -3;
 	}
 
 	if (extractZip(uf, 0, 1, 0)) {
 		gprintf("Failed to extract %s\r\n", filepath);
-		return -3;
+		return -4;
 	}
 
 	unzCloseCurrentFile(uf);
 	unzClose(uf);
 	remove(Downloads[DOWNLOAD_CONTROLLERS].filename);
-	changeToDefaultDrive();
+
+	// Change back to the previous directory.
+	chdir(prev_cwd);
 	return 1;
 }
 
@@ -223,8 +232,8 @@ static s32 Download(DOWNLOADS download_number)  {
 	line++;
 	if (!dir_argument_exists) {
 		gprintf("Creating new directory\r\n");
-		f_mkdir_char("/apps");
-		f_mkdir_char("/apps/Nintendont");
+		mkdir("/apps", 0777);
+		mkdir("/apps/Nintendont", 0777);
 	}
 
 	// Write the file to disk.
@@ -234,15 +243,14 @@ static s32 Download(DOWNLOADS download_number)  {
 	}
 	else
 	{
-		FIL file;
-		if (f_open_char(&file, filepath, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK) {
+		FILE *file = fopen(filepath, "wb");
+		if (!file) {
 			gprintf("File Error\r\n");
 			ret = -3;
 			goto end;
 		} else {
-			UINT wrote;
-			f_write(&file, outbuf, filesize, &wrote);
-			f_close(&file);
+			fwrite(outbuf, 1, filesize, file);
+			fclose(file);
 			ret = 1;
 		}
 	}

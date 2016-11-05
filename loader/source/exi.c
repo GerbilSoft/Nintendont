@@ -27,11 +27,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define	EXI_BASE	0xCD006800
 #define EXI			0xCD006814
 
-#if 0
 static bool wiiu_done = false;
-#endif
-// FIXME: Re-enable Wii U file logging after testing FatFs.
-//static FILE *nl_log = NULL;
+static FILE *nl_log = NULL;
 static u32 GeckoFound = 0;
 
 void CheckForGecko( void )
@@ -74,8 +71,6 @@ int gprintf( const char *str, ... )
 
 	if( IsWiiU() )
 	{
-		// FIXME: Re-enable Wii U file logging after testing FatFs.
-#if 0
 		if(wiiu_done == true)
 			return 0;
 
@@ -85,7 +80,7 @@ int gprintf( const char *str, ... )
 		if (nl_log == NULL)
 		{
 			char LogPath[20];
-			snprintf(LogPath, "%s:/nloader.log", GetRootDevice());
+			snprintf(LogPath, sizeof(LogPath), "%s:/nloader.log", GetRootDevice());
 			nl_log = fopen(LogPath, "w");
 		}
 		if (nl_log != NULL)
@@ -100,7 +95,6 @@ int gprintf( const char *str, ... )
 			// Couldn't open the file
 			return -1;
 		}
-#endif
 	} else {
 		// We're running on a real Wii, send the results to a USB Gecko
 		if (!GeckoFound)
@@ -129,12 +123,9 @@ int gprintf( const char *str, ... )
 
 void closeLog(void)
 {
-	// FIXME: Re-enable Wii U file logging after testing FatFs.
-#if 0
 	wiiu_done = true;
 
 	if(nl_log != NULL)
 		fclose(nl_log);
 	nl_log = NULL;
-#endif
 }

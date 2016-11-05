@@ -44,10 +44,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "HID.h"
 #include "TRI.h"
 
-#include "ff_utf8.h"
-#include "diskio.h"
-// from diskio.c
-extern DISC_INTERFACE *driver[_VOLUMES];
+#include <sys/stat.h>
+#ifdef USE_LIBCUSTOMFAT
+#include <fat.h>
+#else
+#include "ff_devoptab.h"
+#endif
 
 extern void __exception_setreload(int t);
 extern void __SYS_ReadROM(void *buf,u32 len,u32 offset);
@@ -107,10 +109,6 @@ s32 __IOS_LoadStartupIOS(void)
 	return 0;
 }
 
-// Storage devices. (defined in global.c)
-// 0 == SD, 1 == USB
-extern FATFS *devices[2];
-
 extern vu32 FoundVersion;
 vu32 KernelLoaded = 0;
 u32 entrypoint = 0;
@@ -134,8 +132,8 @@ static void updateMetaXml(void)
 
 	if (!dir_argument_exists) {
 		gprintf("Creating new directory\r\n");
-		f_mkdir_char("/apps");
-		f_mkdir_char("/apps/Nintendont");
+		mkdir("/apps", 0777);
+		mkdir("/apps/Nintendont", 0777);
 	}
 
 	char new_meta[1024];
@@ -161,44 +159,38 @@ static void updateMetaXml(void)
 		len = sizeof(new_meta);
 
 	// Check if the file already exists.
-	FIL meta;
-	if (f_open_char(&meta, filepath, FA_READ|FA_OPEN_EXISTING) == FR_OK)
+	FILE *meta = fopen(filepath, "r");
+	if (meta != NULL)
 	{
 		// File exists. If it's the same as the new meta.xml,
 		// don't bother rewriting it.
-		char orig_meta[1024];
-		if (len == meta.obj.objsize)
+		fseek(meta, 0, SEEK_END);
+		long meta_sz = ftell(meta);
+		if (len == meta_sz)
 		{
 			// File is the same length.
-			UINT read;
-			f_read(&meta, orig_meta, len, &read);
-			if (read == (UINT)len &&
+			char orig_meta[1024];
+			size_t read = fread(orig_meta, 1, len, meta);
+			if (read == (size_t)len &&
 			    !strncmp(orig_meta, new_meta, len))
 			{
 				// File is identical.
 				// Don't rewrite it.
-				f_close(&meta);
+				fclose(meta);
 				return;
 			}
 		}
-		f_close(&meta);
+		fclose(meta);
 	}
 
 	// File does not exist, or file is not identical.
 	// Write the new meta.xml.
-	if (f_open_char(&meta, filepath, FA_WRITE|FA_CREATE_ALWAYS) == FR_OK)
+	meta = fopen(filepath, "w");
+	if (meta != NULL)
 	{
-		UINT wrote;
-		f_write(&meta, new_meta, len, &wrote);
-		f_close(&meta);
+		fwrite(new_meta, 1, len, meta);
+		fclose(meta);
 	}
-}
-
-static const WCHAR *primaryDevice;
-void changeToDefaultDrive()
-{
-	f_chdrive(primaryDevice);
-	f_chdir_char("/");
 }
 
 /**
@@ -215,9 +207,8 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 	// Re-read the disc header to get the full ID6.
 	u8 *MultiHdr = memalign(32, 0x800);
 
-	FIL f;
-	UINT read;
-	FRESULT fres = FR_DISK_ERR;
+	FILE *f = NULL;
+	size_t read;
 
 	if(CurDICMD)
 	{
@@ -226,19 +217,19 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 	else if (IsSupportedFileExt(ncfg->GamePath))
 	{
 		snprintf(GamePath, sizeof(GamePath), "%s:%s", GetRootDevice(), ncfg->GamePath);
-		fres = f_open_char(&f, GamePath, FA_READ|FA_OPEN_EXISTING);
-		if (fres != FR_OK)
+		f = fopen(GamePath, "rb");
+		if (!f)
 		{
 			// Error opening the file.
 			free(MultiHdr);
 			return -1;
 		}
 
-		f_read(&f, MultiHdr, 0x800, &read);
+		read = fread(MultiHdr, 1, 0x800, f);
 		if (read != 0x800)
 		{
 			// Error reading from the file.
-			f_close(&f);
+			fclose(f);
 			free(MultiHdr);
 			return -2;
 		}
@@ -256,8 +247,8 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 
 		// Get the bi2.bin region code.
 		snprintf(GamePath, sizeof(GamePath), "%s:%ssys/bi2.bin", GetRootDevice(), ncfg->GamePath);
-		fres = f_open_char(&f, GamePath, FA_READ|FA_OPEN_EXISTING);
-		if (fres != FR_OK)
+		f = fopen(GamePath, "rb");
+		if (!f)
 		{
 			// Error opening bi2.bin.
 			free(MultiHdr);
@@ -266,8 +257,8 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 
 		// bi2.bin is normally 8 KB, but we only need
 		// the first 48 bytes.
-		f_read(&f, MultiHdr, 48, &read);
-		f_close(&f);
+		read = fread(MultiHdr, 1, 48, f);
+		fclose(f);
 		if (read != 48)
 		{
 			// Could not read bi2.bin.
@@ -284,11 +275,8 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 	if (!IsMultiGameDisc((const char*)MultiHdr))
 	{
 		// Not a multi-game disc.
-		if (!CurDICMD)
-		{
-			// Close the disc image file.
-			f_close(&f);
-		}
+		if (f)
+			fclose(f);
 
 		if (BI2region)
 		{
@@ -348,8 +336,9 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 			}
 			else
 			{
-				f_lseek(&f, RealOffset);
-				f_read(&f, GameHdr, 0x800, &read);
+				// FIXME: Handle >4GB with stdio.
+				fseek(f, RealOffset, SEEK_SET);
+				read = fread(GameHdr, 1, 0x800, f);
 			}
 
 			// Make sure the title in the header is NULL terminated.
@@ -371,10 +360,8 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 
 	free(GameHdr);
 	free(MultiHdr);
-	if (!CurDICMD)
-	{
-		f_close(&f);
-	}
+	if (f)
+		fclose(f);
 
 	// TODO: Share code with menu.c.
 	bool redraw = true;
@@ -592,29 +579,7 @@ int main(int argc, char **argv)
 	// Initialize devices.
 	// TODO: Only mount the device Nintendont was launched from
 	// Mount the other device asynchronously.
-	bool foundOneDevice = false;
-	int i;
-	for (i = DEV_SD; i <= DEV_USB; i++)
-	{
-		const WCHAR *devNameFF = MountDevice(i);
-		if (devNameFF && !foundOneDevice)
-		{
-			// Set this device as primary.
-			primaryDevice = devNameFF;
-			changeToDefaultDrive();
-			foundOneDevice = true;
-		}
-	}
-
-	// FIXME: Show this information in the menu instead of
-	// aborting here.
-	if (!devices[DEV_SD] && !devices[DEV_USB])
-	{
-		ClearScreen();
-		gprintf("No FAT device found!\n");
-		PrintFormat(DEFAULT_SIZE, MAROON, MENU_POS_X, 232, "No FAT device found!");
-		ExitToLoader(1);
-	}
+	MountDevices();
 
 	char* first_slash = strrchr(argv[0], '/');
 	if (first_slash != NULL) strncpy(launch_dir, argv[0], first_slash-argv[0]+1);
@@ -744,22 +709,21 @@ int main(int argc, char **argv)
 		// don't write it twice.
 
 		// Write config to the boot device, which is loaded on next launch.
-		FIL cfg;
-		if (f_open_char(&cfg, "/nincfg.bin", FA_WRITE|FA_OPEN_ALWAYS) == FR_OK)
+		FILE *cfg = fopen("/nincfg.bin", "wb");
+		if (cfg != NULL)
 		{
-			UINT wrote;
-			f_write(&cfg, ncfg, sizeof(NIN_CFG), &wrote);
-			f_close(&cfg);
+			fwrite(ncfg, 1, sizeof(NIN_CFG), cfg);
+			fclose(cfg);
 		}
 
 		// Write config to the game device, used by the Nintendont kernel.
 		char ConfigPath[20];
 		snprintf(ConfigPath, sizeof(ConfigPath), "%s:/nincfg.bin", GetRootDevice());
-		if (f_open_char(&cfg, ConfigPath, FA_WRITE|FA_OPEN_ALWAYS) == FR_OK)
+		cfg = fopen(ConfigPath, "wb");
+		if (cfg != NULL)
 		{
-			UINT wrote;
-			f_write(&cfg, ncfg, sizeof(NIN_CFG), &wrote);
-			f_close(&cfg);
+			fwrite(ncfg, 1, sizeof(NIN_CFG), cfg);
+			fclose(cfg);
 		}
 	}
 
@@ -804,7 +768,7 @@ int main(int argc, char **argv)
 		// Set up the memory card file.
 		char BasePath[20];
 		snprintf(BasePath, sizeof(BasePath), "%s:/saves", GetRootDevice());
-		f_mkdir_char(BasePath);
+		mkdir(BasePath, 0777);
 
 		char MemCardName[8];
 		memset(MemCardName, 0, 8);
@@ -838,8 +802,8 @@ int main(int argc, char **argv)
 		char MemCard[32];
 		snprintf(MemCard, sizeof(MemCard), "%s/%s.raw", BasePath, MemCardName);
 		gprintf("Using %s as Memory Card.\r\n", MemCard);
-		FIL f;
-		if (f_open_char(&f, MemCard, FA_READ|FA_OPEN_EXISTING) != FR_OK)
+		FILE *f = fopen(MemCard, "rb");
+		if (!f)
 		{
 			// Memory card file not found. Create it.
 			if(GenerateMemCard(MemCard, BI2region) == false)
@@ -851,7 +815,7 @@ int main(int argc, char **argv)
 		else
 		{
 			// Memory card file found.
-			f_close(&f);
+			fclose(f);
 		}
 	}
 	else
@@ -900,18 +864,23 @@ int main(int argc, char **argv)
 				break;
 		}
 
-		FIL f;
-		if (iplchar[0] != 0 &&
-		    f_open_char(&f, iplchar, FA_READ|FA_OPEN_EXISTING) == FR_OK)
+		FILE *f = NULL;
+		if (iplchar[0] != 0)
 		{
-			if (f.obj.objsize == GCN_IPL_SIZE)
+			f = fopen(iplchar, "rb");
+		}
+		if (f != NULL)
+		{
+			fseek(f, 0, SEEK_END);
+			long fsize = ftell(f);
+			if (fsize == GCN_IPL_SIZE)
 			{
+				fseek(f, 0, SEEK_SET);
 				iplbuf = malloc(GCN_IPL_SIZE);
-				UINT read;
-				f_read(&f, iplbuf, GCN_IPL_SIZE, &read);
+				size_t read = fread(iplbuf, 1, GCN_IPL_SIZE, f);
 				useipl = (read == GCN_IPL_SIZE);
 			}
-			f_close(&f);
+			fclose(f);
 		}
 	}
 	else
@@ -919,18 +888,19 @@ int main(int argc, char **argv)
 		// Attempt to load the Triforce IPL. (segaboot)
 		char iplchar[32];
 		snprintf(iplchar, sizeof(iplchar), "%s:/segaboot.bin", GetRootDevice());
-		FIL f;
-		if (f_open_char(&f, iplchar, FA_READ|FA_OPEN_EXISTING) == FR_OK)
+		FILE *f = fopen(iplchar, "rb");
+		if (f != NULL)
 		{
-			if (f.obj.objsize == TRI_IPL_SIZE)
+			fseek(f, 0, SEEK_END);
+			long fsize = ftell(f);
+			if (fsize == TRI_IPL_SIZE)
 			{
-				f_lseek(&f, 0x20);
+				fseek(f, 0x20, SEEK_SET);
 				void *iplbuf = (void*)0x92A80000;
-				UINT read;
-				f_read(&f, iplbuf, TRI_IPL_SIZE - 0x20, &read);
+				size_t read = fread(iplbuf, 1, TRI_IPL_SIZE - 0x20, f);
 				useipltri = (read == (TRI_IPL_SIZE - 0x20));
 			}
-			f_close(&f);
+			fclose(f);
 		}
 	}
 

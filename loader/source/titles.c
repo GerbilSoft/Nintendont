@@ -31,8 +31,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "global.h"
 #include "exi.h"
 
-#include "ff_utf8.h"
-
 
 #define MAX_TITLES	740		// That should cover every GC game
 #define LINE_LENGTH	64		// Max is actually 61, but this improves performance.
@@ -89,8 +87,8 @@ int LoadTitles(void)
 	snprintf(filepath, sizeof(filepath), "%stitles.txt",
 		 launch_dir[0] != 0 ? launch_dir : "/apps/Nintendont/");
 
-	FIL titles_txt;
-	if (f_open_char(&titles_txt, filepath, FA_READ|FA_OPEN_EXISTING) != FR_OK)
+	FILE *titles_txt = fopen(filepath, "r");
+	if (!titles_txt)
 		return 0;
 
 	char *cur_title = &__title_list[0][0];
@@ -99,11 +97,11 @@ int LoadTitles(void)
 
 	// FIXME: Optimize title loading by reading chunks at a time
 	// instead of single bytes.
+	// TODO: Switch back to getline()?
 	char c;
 	int pos = 0;
-	UINT read;
 	do {
-		if (f_read(&titles_txt, &c, 1, &read) != FR_OK || read == 0)
+		if (fread(&c, 1, 1, titles_txt) != 1)
 			c = 0;
 		if (c == '\r') {
 			continue;
@@ -126,8 +124,8 @@ int LoadTitles(void)
 			*cur_title++ = c;
 			pos++;
 		}
-	} while (!f_eof(&titles_txt) && c != 0);
-	f_close(&titles_txt);
+	} while (!feof(titles_txt) && c != 0);
+	fclose(titles_txt);
 
 	// Sort the titles so we can do a binary search later.
 	// __title_list[] format: "ID3-Title"

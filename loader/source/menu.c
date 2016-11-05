@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "update.h"
 #include "titles.h"
 #include "dip.h"
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
@@ -42,7 +43,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "menu.h"
 #include "../../common/include/CommonConfigStrings.h"
 
-#include "ff_utf8.h"
+// MD5 calculation.
 #include "md5.h"
 
 // Dark gray for grayed-out menu items.
@@ -122,8 +123,8 @@ static bool IsDiscImageValid(const char *filename, int discNumber, gameinfo *gi)
 	// TODO: Handle FST format (sys/boot.bin).
 	u8 buf[0x100];		// Disc header.
 
-	FIL in;
-	if (f_open_char(&in, filename, FA_READ|FA_OPEN_EXISTING) != FR_OK)
+	FILE *in = fopen(filename, "rb");
+	if (!in)
 	{
 		// Could not open the disc image.
 		return false;
@@ -132,12 +133,11 @@ static bool IsDiscImageValid(const char *filename, int discNumber, gameinfo *gi)
 	// Read the disc header
 	//gprintf("(%s) ok\n", filename );
 	bool ret = false;
-	UINT read;
-	f_read(&in, buf, 0x100, &read);
+	size_t read = fread(buf, 1, 0x100, in);
 	if (read != 0x100)
 	{
 		// Error reading from the file.
-		f_close(&in);
+		fclose(in);
 		return false;
 	}
 
@@ -150,12 +150,12 @@ static bool IsDiscImageValid(const char *filename, int discNumber, gameinfo *gi)
 		// CISO magic is present, and GCN magic isn't.
 		// This is most likely a CISO image.
 		// Read the actual GCN header.
-		f_lseek(&in, 0x8000);
-		f_read(&in, buf, 0x100, &read);
+		fseek(in, 0x8000, SEEK_SET);
+		read = fread(buf, 1, 0x100, in);
 		if (read != 0x100)
 		{
 			// Error reading from the file.
-			f_close(&in);
+			fclose(in);
 			return false;
 		}
 
@@ -166,7 +166,9 @@ static bool IsDiscImageValid(const char *filename, int discNumber, gameinfo *gi)
 		// Standard GameCube disc image.
 		// TODO: Detect Triforce images and exclude them
 		// from size checking?
-		if (in.obj.objsize == 1459978240)
+		fseek(in, 0, SEEK_END);
+		long size = ftell(in);
+		if (size == 1459978240)
 		{
 			// Full 1:1 GameCube image.
 			gi->Flags = GIFLAG_FORMAT_FULL;
@@ -179,7 +181,7 @@ static bool IsDiscImageValid(const char *filename, int discNumber, gameinfo *gi)
 	}
 
 	// File is no longer needed.
-	f_close(&in);
+	fclose(in);
 
 	if (IsGCGame(buf))	// Must be GC game
 	{
@@ -280,15 +282,16 @@ static DevState LoadGameList(gameinfo *gi, u32 sz, u32 *pGameCount)
 		gamecount++;
 	}
 
-	DIR pdir;
 	snprintf(filename, sizeof(filename), "%s:/games", GetRootDevice());
-	if (f_opendir_char(&pdir, filename) != FR_OK)
+	DIR *pdir = opendir(filename);
+	if (!pdir)
 	{
 		// Could not open the "games" directory.
 
 		// Attempt to open the device root.
 		snprintf(filename, sizeof(filename), "%s:/", GetRootDevice());
-		if (f_opendir_char(&pdir, filename) != FR_OK)
+		pdir = opendir(filename);
+		if (!pdir)
 		{
 			// Could not open the device root.
 			if (pGameCount)
@@ -299,7 +302,7 @@ static DevState LoadGameList(gameinfo *gi, u32 sz, u32 *pGameCount)
 		// Device root opened.
 		// This means the device is usable, but it
 		// doesn't have a "games" directory.
-		f_closedir(&pdir);
+		closedir(pdir);
 		if (pGameCount)
 			*pGameCount = gamecount;
 		return DEV_NO_GAMES;
@@ -307,9 +310,8 @@ static DevState LoadGameList(gameinfo *gi, u32 sz, u32 *pGameCount)
 
 	// Process the directory.
 	// TODO: chdir into /games/?
-	FILINFO fInfo;
-	FIL in;
-	while (f_readdir(&pdir, &fInfo) == FR_OK && fInfo.fname[0] != '\0')
+	struct dirent *entry;
+	while ((entry = readdir(pdir)) != NULL)
 	{
 		/**
 		 * Game layout should be:
@@ -339,19 +341,17 @@ static DevState LoadGameList(gameinfo *gi, u32 sz, u32 *pGameCount)
 
 		// Skip "." and "..".
 		// This will also skip "hidden" directories.
-		if (fInfo.fname[0] == '.')
+		if (entry->d_name[0] == 0 || entry->d_name[0] == '.')
 			continue;
 
-		if (fInfo.fattrib & AM_DIR)
+		if (entry->d_type == DT_DIR)
 		{
 			// Subdirectory.
 
 			// Prepare the filename buffer with the directory name.
 			// game.iso/disc2.iso will be appended later.
-			// NOTE: fInfo.fname[] is UTF-16.
-			const char *filename_utf8 = wchar_to_char(fInfo.fname);
 			int fnlen = snprintf(filename, sizeof(filename), "%s:/games/%s/",
-					     GetRootDevice(), filename_utf8);
+					     GetRootDevice(), entry->d_name);
 
 			//Test if game.iso exists and add to list
 			bool found = false;
@@ -385,12 +385,12 @@ static DevState LoadGameList(gameinfo *gi, u32 sz, u32 *pGameCount)
 			if (!found)
 			{
 				memcpy(&filename[fnlen], "sys/boot.bin", 13);
-				if (f_open_char(&in, filename, FA_READ|FA_OPEN_EXISTING) == FR_OK)
+				FILE *in = fopen(filename, "rb");
+				if (in != NULL)
 				{
 					//gprintf("(%s) ok\n", filename );
-					UINT read;
-					f_read(&in, buf, 0x100, &read);
-					f_close(&in);
+					size_t read = fread(buf, 1, 0x100, in);
+					fclose(in);
 
 					if (read == 0x100 && IsGCGame(buf))	// Must be GC game
 					{
@@ -418,12 +418,11 @@ static DevState LoadGameList(gameinfo *gi, u32 sz, u32 *pGameCount)
 			// Regular file.
 
 			// Make sure its extension is ".iso" or ".gcm".
-			const char *filename_utf8 = wchar_to_char(fInfo.fname);
-			if (IsSupportedFileExt(filename_utf8))
+			if (IsSupportedFileExt(entry->d_name))
 			{
 				// Create the full pathname.
 				snprintf(filename, sizeof(filename), "%s:/games/%s",
-					 GetRootDevice(), filename_utf8);
+					 GetRootDevice(), entry->d_name);
 
 				// Attempt to load disc information.
 				// (NOTE: Only disc 1 is supported right now.)
@@ -438,7 +437,7 @@ static DevState LoadGameList(gameinfo *gi, u32 sz, u32 *pGameCount)
 		if (gamecount >= sz)	//if array is full
 			break;
 	}
-	f_closedir(&pdir);
+	closedir(pdir);
 
 	// Sort the list alphabetically.
 	// On Wii, the pseudo-entry for GameCube discs is always
@@ -558,14 +557,16 @@ static void VerifyMD5(const gameinfo *gi)
 	ClearScreen();
 
 	// Open the file.
-	FIL in;
-	if (f_open_char(&in, gi->Path, FA_READ|FA_OPEN_EXISTING) != FR_OK)
+	FILE *in = fopen(gi->Path, "rb");
+	if (!in)
 	{
 		// Could not open the disc image.
 		// TODO: Show an error.
 		return;
 	}
 
+	// FIXME: Enable FASTSEEK in FatFS devoptab?
+#if 0
 #ifdef _USE_FASTSEEK
 	// Set up a FatFS link map for faster operation.
 	u32 tblsize = 4; //minimum default size
@@ -595,6 +596,7 @@ static void VerifyMD5(const gameinfo *gi)
 		in.cltbl = NULL;
 	}
 #endif /* _USE_FASTSEEK */
+#endif
 
 	// snprintf() buffer for the status message.
 	char status_msg[128];
@@ -607,7 +609,7 @@ static void VerifyMD5(const gameinfo *gi)
 	{
 		// Memory allocation failed.
 		// TODO: Show an error.
-		f_close(&in);
+		fclose(in);
 		return;
 	}
 
@@ -616,11 +618,14 @@ static void VerifyMD5(const gameinfo *gi)
 	gettimeofday_rvlfix(&tv, NULL);
 	float time_start = tv.tv_sec + ((float)tv.tv_usec / 1000000.0f);
 
+	fseek(in, 0, SEEK_END);
+	const size_t total_size = ftell(in);
+	fseek(in, 0, SEEK_SET);
+
 	u32 total_read = 0;
 	u32 total_read_mb = 0;
-	const u32 total_size = f_size(&in);
 	bool cancel = false;
-	while (!f_eof(&in))
+	while (!feof(in))
 	{
 		FPAD_Update();
 		if (FPAD_Cancel(0))
@@ -630,15 +635,9 @@ static void VerifyMD5(const gameinfo *gi)
 			break;
 		}
 
-		UINT read;
-		FRESULT res = f_read(&in, buf, buf_sz, &read);
-		if (res != FR_OK)
-		{
-			// TODO: Show an error.
-			free(buf);
-			f_close(&in);
-			return;
-		}
+		size_t read = fread(buf, 1, buf_sz, in);
+		if (read == 0)
+			break;
 
 		// Process the data.
 		md5_append(&state, (const md5_byte_t*)buf, read);
@@ -672,10 +671,15 @@ static void VerifyMD5(const gameinfo *gi)
 	}
 
 	free(buf);
-	f_close(&in);
+	fclose(in);
+	// TODO: Enable this in devoptab.
+#if 0
 #ifdef _USE_FASTSEEK
 	free(in.cltbl);
 #endif
+#endif
+
+	// TODO: Verify total_read and show an error if it's wrong.
 
 	if (cancel)
 	{
