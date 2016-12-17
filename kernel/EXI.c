@@ -54,8 +54,9 @@ static u8 *const FontBuf = (u8*)(0x13100000);
 static u32 IPLReadOffset;
 bool EXI_IRQ = false;
 static u32 IRQ_Timer = 0;
-static u32 IRQ_Cause = 0;
-static u32 IRQ_Cause2= 0;
+static u32 IRQ_CauseCh0 = 0;
+static u32 IRQ_CauseCh1= 0;
+static u32 IRQ_CauseCh2= 0;
 
 // EXI devices.
 // Low 2 bits: Device number. (0-2)
@@ -174,8 +175,9 @@ bool EXICheckTimer(void)
 }
 void EXIInterrupt(void)
 {
-	write32( 0x10, IRQ_Cause );
-	write32( 0x18, IRQ_Cause2 );
+	write32( 0x10, IRQ_CauseCh0 );
+	write32( 0x14, IRQ_CauseCh1 );
+	write32( 0x18, IRQ_CauseCh2 );
 	sync_after_write( (void*)0, 0x20 );
 	write32( EXI_INT, 0x10 ); // EXI IRQ
 	sync_after_write( (void*)EXI_INT, 0x20 );
@@ -183,8 +185,9 @@ void EXIInterrupt(void)
 	//dbgprintf("EXI Interrupt\r\n");
 	EXI_IRQ = false;
 	IRQ_Timer = 0;
-	IRQ_Cause = 0;
-	IRQ_Cause2 = 0;
+	IRQ_CauseCh0 = 0;
+	IRQ_CauseCh1 = 0;
+	IRQ_CauseCh2 = 0;
 }
 
 void EXIShutdown(void)
@@ -286,12 +289,15 @@ static void EXIDeviceMemoryCard(int slot, u8 *Data, u32 Length, u32 Mode)
 					{
 						GCNCard_SetBlockOffset_Erase(slot, (u32)Data);
 #ifdef DEBUG_EXI
-						dbgprintf("EXI: Slot %c: CARDErasePage(%08X)\r\n", (slot+'A'), ctx->BlockOff);
+						dbgprintf("EXI: Slot %c: CARDErasePage(%08X)\r\n", (slot+'A'), Data);
 #endif
 						// FIXME: ERASE command isn't implemented.
 						EXICommand[slot] = MEM_BLOCK_ERASE;
 						GCNCard_ClearWriteCount(slot);
-						IRQ_Cause = 2;			// EXI IRQ
+						if (slot!=1)
+							IRQ_CauseCh0 = 2;			// EXI IRQ
+						else
+							IRQ_CauseCh1 = 2;			// EXI IRQ
 						EXIOK = 2;
 					} break;
 				}
@@ -307,19 +313,22 @@ static void EXIDeviceMemoryCard(int slot, u8 *Data, u32 Length, u32 Mode)
 					{
 						GCNCard_SetBlockOffset(slot, (u32)Data);
 #ifdef DEBUG_EXI
-						dbgprintf("EXI: Slot %c: CARDErasePage(%08X)\r\n", (slot+'A'), ctx->BlockOff);
+						dbgprintf("EXI: Slot %c: CARDErasePage(%08X)\r\n", (slot+'A'), Data);
 #endif
 						// FIXME: ERASE command isn't implemented.
 						EXICommand[slot] = MEM_BLOCK_ERASE;
 						GCNCard_ClearWriteCount(slot);
-						IRQ_Cause = 2;			// EXI IRQ
+						if (slot!=1)
+							IRQ_CauseCh0 = 2;			// EXI IRQ
+						else
+							IRQ_CauseCh1 = 2;			// EXI IRQ
 						EXIOK = 2;
 					} break;
 					case 0xF2:
 					{
 						GCNCard_SetBlockOffset(slot, (u32)Data);
 #ifdef DEBUG_EXI
-						dbgprintf("EXI: Slot %c: CARDWritePage(%08X)\r\n", (slot+'A'), ctx->BlockOff);
+						dbgprintf("EXI: Slot %c: CARDWritePage(%08X)\r\n", (slot+'A'), Data);
 #endif
 						EXICommand[slot] = MEM_BLOCK_WRITE;
 					} break;
@@ -327,7 +336,7 @@ static void EXIDeviceMemoryCard(int slot, u8 *Data, u32 Length, u32 Mode)
 					{
 						GCNCard_SetBlockOffset(slot, (u32)Data);
 #ifdef DEBUG_EXI
-						dbgprintf("EXI: Slot %c: CARDReadPage(%08X)\r\n", (slot+'A'), ctx->BlockOff);
+						dbgprintf("EXI: Slot %c: CARDReadPage(%08X)\r\n", (slot+'A'), Data);
 #endif
 
 						EXICommand[slot] = MEM_BLOCK_READ;
@@ -348,7 +357,10 @@ static void EXIDeviceMemoryCard(int slot, u8 *Data, u32 Length, u32 Mode)
 					case MEM_BLOCK_WRITE:
 					{
 						GCNCard_Write(slot, Data, Length);
-						IRQ_Cause = 10;	// TC(8) & EXI(2) IRQ
+						if (slot!=1)
+							IRQ_CauseCh0 = 10;	// TC(8) & EXI(2) IRQ
+						else
+							IRQ_CauseCh1 = 10;	// TC(8) & EXI(2) IRQ
 						EXIOK = 2;
 					} break;
 				}
@@ -382,7 +394,10 @@ static void EXIDeviceMemoryCard(int slot, u8 *Data, u32 Length, u32 Mode)
 			case MEM_BLOCK_READ:
 			{
 				GCNCard_Read(slot, Data, Length);
-				IRQ_Cause = 8;		// TC IRQ
+				if (slot!=1)
+					IRQ_CauseCh0 = 8;		// TC IRQ
+				else
+					IRQ_CauseCh1 = 8;		// TC IRQ
 				EXIOK = 2;
 			} break;
 		}
@@ -673,8 +688,8 @@ u32 EXIDeviceSP1( u8 *Data, u32 Length, u32 Mode )
 	if( EXIOK == 2 )
 	{
 		//dbgprintf("EXI: Triforce IRQ\r\n");
-		IRQ_Cause = 8;
-		IRQ_Cause2 = 2;
+		IRQ_CauseCh0 = 8;
+		IRQ_CauseCh2 = 2;
 		EXI_IRQ = true;
 		IRQ_Timer = read32(HW_TIMER);
 	}
