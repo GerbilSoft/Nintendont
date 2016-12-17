@@ -17,7 +17,8 @@ static u8 *const GCNCard_base = (u8*)(0x11000000);
 
 // Use GCI Folders instead of card images?
 // TODO: Make this a configurable option.
-static const bool UseGCIFolders = true;
+//static const bool UseGCIFolders = true;
+static const bool UseGCIFolders = false;
 
 typedef struct _GCNCard_ctx {
 	char filename[0x20];    // Memory Card filename, or directory for GCI folders.
@@ -502,7 +503,7 @@ static int GCNCard_LoadRAWImage(int slot)
 	const u32 GameID = ConfigGetGameID();
 
 	// Make sure the "/saves/" directory exists.
-	int ret = f_mkdir_char("/saves/");
+	int ret = f_mkdir_char("/saves");
 	if (ret != FR_OK && ret != FR_EXIST)
 		Shutdown();
 
@@ -709,6 +710,7 @@ static int GCNCard_LoadRAWImage(int slot)
 		ncfg->Config |= NIN_CFG_MC_SLOTB;
 	}
 #endif /* GCNCARD_ENABLE_SLOT_B */
+	return 0;
 }
 
 /**
@@ -749,6 +751,7 @@ int GCNCard_Load(int slot)
 	}
 
 #ifdef DEBUG_EXI
+	GCNCard_ctx *const ctx = &memCard[slot];
 	dbgprintf("EXI: Loaded Slot %c memory card size %u\r\n", (slot+'A'), ctx->size);
 #endif
 	return 0;
