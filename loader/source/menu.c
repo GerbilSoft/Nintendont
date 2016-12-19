@@ -983,6 +983,36 @@ static const char *const *GetSettingsDescription(const MenuCtx *ctx)
 				return desc_tri_arcade;
 			}
 
+			case 4: {
+				// Wiimote CC Rumble
+				static const char *desc_wiimote_cc_rumble[] = {
+					"Enable Wii Remote rumble when",
+					"using a Classic Controller.",
+					NULL
+				};
+				return desc_wiimote_cc_rumble;
+			}
+
+			case 5: {
+				// Enable GameCube IPL.
+				static const char *desc_gcn_ipl[] = {
+					"Enable the GameCube IPL.",
+					"(startup animation and menu)",
+					"",
+					"You must have a copy of the",
+					"IPL on / with these names:",
+					"",
+					"- ipljap.bin",
+					"- iplusa.bin",
+					"- iplpal.bin",
+					"",
+					"Note that iplpal.bin does",
+					"not work on Wii U systems.",
+					NULL
+				};
+				return desc_gcn_ipl;
+			}
+
 			default:
 				break;
 		}
@@ -1303,19 +1333,19 @@ static bool UpdateSettingsMenu(MenuCtx *ctx)
 					ctx->redraw = true;
 					break;
 
-        case 4:
-          // Wiimote CC Rumble
-          ctx->saveSettings = true;
-          ncfg->Config ^= (NIN_CFG_CC_RUMBLE);
-          ctx->redraw = true;
-          break;
- 
-        case 5:
-          // IPL
-          ctx->saveSettings = true;
-          ncfg->Config ^= (NIN_CFG_IPL);
-          ctx->redraw = true;
-          break;
+				case 4:
+					// Wiimote CC Rumble
+					ctx->saveSettings = true;
+					ncfg->Config ^= (NIN_CFG_CC_RUMBLE);
+					ctx->redraw = true;
+					break;
+			
+				case 5:
+					// IPL
+					ctx->saveSettings = true;
+					ncfg->Config ^= (NIN_CFG_IPL);
+					ctx->redraw = true;
+					break;
 
 				default:
 					break;
