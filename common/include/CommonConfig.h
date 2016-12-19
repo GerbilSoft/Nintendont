@@ -5,7 +5,7 @@
 #include "NintendontVersion.h"
 #include "Metadata.h"
 
-#define NIN_CFG_VERSION		0x00000007
+#define NIN_CFG_VERSION		0x00000008
 
 #define NIN_CFG_MAXPAD 4
 
@@ -48,9 +48,11 @@ enum ninconfigbitpos
 	NIN_CFG_BIT_NATIVE_SI	= (14),
 	NIN_CFG_BIT_WIIU_WIDE	= (15),
 	NIN_CFG_BIT_ARCADE_MODE = (16),
+	NIN_CFG_BIT_CC_RUMBLE	= (17),
+	NIN_CFG_BIT_IPL		= (18),
 
 	// Internal kernel settings.
-	NIN_CFG_BIT_MC_SLOTB	= (17),	// Slot B image is loaded
+	NIN_CFG_BIT_MC_SLOTB	= (19),	// Slot B image is loaded
 };
 
 enum ninconfig
@@ -73,6 +75,10 @@ enum ninconfig
 	NIN_CFG_NATIVE_SI	= (1<<NIN_CFG_BIT_NATIVE_SI),	// Only for Wii Version
 	NIN_CFG_WIIU_WIDE	= (1<<NIN_CFG_BIT_WIIU_WIDE),	// Only for Wii U Version
 	NIN_CFG_ARCADE_MODE	= (1<<NIN_CFG_BIT_ARCADE_MODE),
+	NIN_CFG_CC_RUMBLE	= (1<<NIN_CFG_BIT_CC_RUMBLE),
+	NIN_CFG_IPL		= (1<<NIN_CFG_BIT_IPL),
+
+	// Internal kernel settings.
 	NIN_CFG_MC_SLOTB	= (1<<NIN_CFG_BIT_MC_SLOTB),
 };
 
