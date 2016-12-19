@@ -9,6 +9,8 @@
 .set		NinCfg,		0xD3002900
 .set		NinCfgConfig,	NinCfg + 0x8
 
+.set		SLOTB_EN,	0x00020000
+
 EXIProbe:
 	lis	%r4,	NinCfgConfig@h
 	lwz	%r4,	NinCfgConfig@l(%r4)
@@ -23,7 +25,7 @@ EXIProbe:
 
 	lis	%r4,	NinCfgConfig@h
 	lwz	%r4,	NinCfgConfig@l(%r4)
-	andis.	%r4,	%r4,	0x2		# Check if a Slot B image was loaded.
+	andis.	%r4,	%r4,	SLOTB_EN@h	# Check if a Slot B image was loaded.
 	bne	True
 
 False:
