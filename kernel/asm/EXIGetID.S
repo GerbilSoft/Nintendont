@@ -11,7 +11,7 @@
 .set	NinCfg,		0xD3002900
 .set	NinCfgConfig,	NinCfg + 0x8
 
-.set		SLOTB_EN,	0x00080000
+.set		SLOTB_EN,	0x80000000
 
 EXIGetID:
 	# Check for device 0.

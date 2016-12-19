@@ -52,7 +52,7 @@ enum ninconfigbitpos
 	NIN_CFG_BIT_IPL		= (18),
 
 	// Internal kernel settings.
-	NIN_CFG_BIT_MC_SLOTB	= (19),	// Slot B image is loaded
+	NIN_CFG_BIT_MC_SLOTB	= (31),	// Slot B image is loaded
 };
 
 enum ninconfig
