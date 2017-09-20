@@ -229,38 +229,32 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 	UINT read;
 	FRESULT fres = FR_DISK_ERR;
 
-	if(CurDICMD)
-	{
+	if (CurDICMD) {
 		if(CurDICMD == DIP_CMD_WIIVC)
 			WDVD_FST_Read(MultiHdr, 0, 0x800);
 		else
 			ReadRealDisc(MultiHdr, 0, 0x800, CurDICMD);
-	}
-	else if (IsSupportedFileExt(ncfg->GamePath))
-	{
+	} else if (IsSupportedFileExt(ncfg->GamePath)) {
 		snprintf(GamePath, sizeof(GamePath), "%s:%s", GetRootDevice(), ncfg->GamePath);
 		fres = f_open_char(&f, GamePath, FA_READ|FA_OPEN_EXISTING);
-		if (fres != FR_OK)
-		{
+		if (fres != FR_OK) {
 			// Error opening the file.
 			free(MultiHdr);
-			return -1;
+			return 1;
 		}
 
 		f_read(&f, MultiHdr, 0x800, &read);
-		if (read != 0x800)
-		{
+		if (read != 0x800) {
 			// Error reading from the file.
 			f_close(&f);
 			free(MultiHdr);
-			return -2;
+			return 2;
 		}
 
 		// Check for CISO magic with 2 MB block size.
 		// NOTE: CISO block size is little-endian.
 		static const uint8_t CISO_MAGIC[8] = {'C','I','S','O',0x00,0x00,0x20,0x00};
-		if (!memcmp(MultiHdr, CISO_MAGIC, sizeof(CISO_MAGIC)) && !IsGCGame(MultiHdr))
-		{
+		if (!memcmp(MultiHdr, CISO_MAGIC, sizeof(CISO_MAGIC)) && !IsGCGame(MultiHdr)) {
 			// CISO magic is present, and GCN magic isn't.
 			// This is most likely a CISO image.
 
@@ -269,14 +263,12 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 			int ret = 0;
 			if (ISOShift)
 				*ISOShift = 0;
-			if (BI2region)
-			{
+			if (BI2region) {
 				f_lseek(&f, 0x8458);
 				f_read(&f, BI2region, sizeof(*BI2region), &read);
-				if (read != sizeof(*BI2region))
-				{
+				if (read != sizeof(*BI2region)) {
 					// Error reading from the file.
-					ret = -3;
+					ret = 3;
 				}
 			}
 
@@ -284,15 +276,12 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 			free(MultiHdr);
 			return ret;
 		}
-	}
-	else
-	{
+	} else {
 		// Extracted FST format.
 		// Multi-game isn't supported.
 		if (ISOShift)
 			*ISOShift = 0;
-		if (!BI2region)
-		{
+		if (!BI2region) {
 			free(MultiHdr);
 			return 0;
 		}
@@ -300,22 +289,20 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 		// Get the bi2.bin region code.
 		snprintf(GamePath, sizeof(GamePath), "%s:%ssys/bi2.bin", GetRootDevice(), ncfg->GamePath);
 		fres = f_open_char(&f, GamePath, FA_READ|FA_OPEN_EXISTING);
-		if (fres != FR_OK)
-		{
+		if (fres != FR_OK) {
 			// Error opening bi2.bin.
 			free(MultiHdr);
-			return -4;
+			return 4;
 		}
 
 		// bi2.bin is normally 8 KB, but we only need
 		// the first 48 bytes.
 		f_read(&f, MultiHdr, 48, &read);
 		f_close(&f);
-		if (read != 48)
-		{
+		if (read != 48) {
 			// Could not read bi2.bin.
 			free(MultiHdr);
-			return -5;
+			return 5;
 		}
 
 		// BI2.bin is at 0x440.
@@ -325,17 +312,14 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 		return 0;
 	}
 
-	if (!IsMultiGameDisc((const char*)MultiHdr))
-	{
+	if (!IsMultiGameDisc((const char*)MultiHdr)) {
 		// Not a multi-game disc.
-		if (!CurDICMD)
-		{
+		if (!CurDICMD) {
 			// Close the disc image file.
 			f_close(&f);
 		}
 
-		if (BI2region)
-		{
+		if (BI2region) {
 			// BI2.bin is at 0x440.
 			// Region code is at 0x458.
 			*BI2region = *(u32*)(&MultiHdr[0x458]);
@@ -364,20 +348,15 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 	// FIXME: Needs 64-bit offsets.
 	const u32 *hdr32 = (const u32*)MultiHdr;
 	bool IsShifted = (hdr32[1] == 0x44564439);
-	for (i = 0x10; i < 0x40 && gamecount < 15; i++)
-	{
+	for (i = 0x10; i < 0x40 && gamecount < 15; i++) {
 		const u32 TmpOffset = hdr32[i];
-		if (TmpOffset > 0)
-		{
+		if (TmpOffset > 0) {
 			u64 RealOffset;
-			if (IsShifted)
-			{
+			if (IsShifted) {
 				// Disc uses 34-bit shifted offsets.
 				Offsets[gamecount] = TmpOffset;
 				RealOffset = (u64)TmpOffset << 2;
-			}
-			else
-			{
+			} else {
 				// Disc uses 32-bit unshifted offsets.
 				// If the value isn't a multiple of 4, it's unusable.
 				// TODO: Fix this, or will this "never" happen?
@@ -386,15 +365,13 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 				RealOffset = TmpOffset;
 			}
 
-			if(CurDICMD)
-			{
-				if(CurDICMD == DIP_CMD_WIIVC)
+			if (CurDICMD) {
+				if (CurDICMD == DIP_CMD_WIIVC) {
 					WDVD_FST_Read(GameHdr, RealOffset, 0x800);
-				else
+				} else {
 					ReadRealDisc(GameHdr, RealOffset, 0x800, CurDICMD);
-			}
-			else
-			{
+				}
+			} else {
 				f_lseek(&f, RealOffset);
 				f_read(&f, GameHdr, 0x800, &read);
 			}
@@ -418,8 +395,7 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 
 	free(GameHdr);
 	free(MultiHdr);
-	if (!CurDICMD)
-	{
+	if (!CurDICMD) {
 		f_close(&f);
 	}
 
@@ -428,58 +404,46 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 	ClearScreen();
 	u32 PosX = 0;
 	u32 UpHeld = 0, DownHeld = 0;
-	while (true)
-	{
+	while (true) {
 		VIDEO_WaitVSync();
 		FPAD_Update();
-		if( FPAD_OK(0) )
-		{
+		if (FPAD_OK(0)) {
 			// TODO: Fix support for unaligned games?
 			if (!gameIsUnaligned[PosX])
 				break;
 		}
 
-		if( FPAD_Down(1) )
-		{
-			if(DownHeld == 0 || DownHeld > 10)
-			{
+		if (FPAD_Down(1)) {
+			if (DownHeld == 0 || DownHeld > 10) {
 				PosX++;
 				if(PosX == gamecount) PosX = 0;
 				redraw = true;
 			}
 			DownHeld++;
-		}
-		else
-		{
+		} else {
 			DownHeld = 0;
 		}
 
-		if( FPAD_Up(1) )
-		{
-			if(UpHeld == 0 || UpHeld > 10)
-			{
+		if (FPAD_Up(1)) {
+			if (UpHeld == 0 || UpHeld > 10) {
 				if(PosX == 0) PosX = gamecount;
 				PosX--;
 				redraw = true;
 			}
 			UpHeld++;
-		}
-		else
-		{
+		} else {
 			UpHeld = 0;
 		}
 
 		// TODO: Home = Go Back?
 
-		if( redraw )
-		{
+		if (redraw) {
 			PrintInfo();
 			PrintButtonActions(NULL, "Select", NULL, NULL);
 			static const int subheader_x = (640 - (40*10)) / 2;
 			PrintFormat(DEFAULT_SIZE, BLACK, subheader_x, MENU_POS_Y + 20*3,
 				    "Select a game from this multi-game disc:");
-			for (i = 0; i < gamecount; ++i)
-			{
+			for (i = 0; i < gamecount; ++i) {
 				const u32 color = gameIsUnaligned[i] ? MAROON : BLACK;
 				PrintFormat(DEFAULT_SIZE, color, MENU_POS_X, MENU_POS_Y + 20*4 + i * 20, "%50.50s [%.6s]%s", 
 					    gi[i].Name, gi[i].ID, i == PosX ? ARROW_LEFT : " " );
@@ -492,19 +456,16 @@ static u32 CheckForMultiGameAndRegion(u32 CurDICMD, u32 *ISOShift, u32 *BI2regio
 	}
 
 	// Free the allocated names.
-	for (i = 0; i < gamecount; ++i)
-	{
+	for (i = 0; i < gamecount; ++i) {
 		if (gi[i].Flags & GIFLAG_NAME_ALLOC)
 			free(gi[i].Name);
 	}
 
 	// Set the ISOShift and BI2region values.
-	if (ISOShift)
-	{
+	if (ISOShift) {
 		*ISOShift = Offsets[PosX];
 	}
-	if (BI2region)
-	{
+	if (BI2region) {
 		*BI2region = BI2region_codes[PosX];
 	}
 
@@ -912,10 +873,68 @@ int main(int argc, char **argv)
 	// Get multi-game and region code information.
 	u32 ISOShift = 0;	// NOTE: This is a 34-bit shifted offset.
 	u32 BI2region = 0;	// bi2.bin region code [TODO: Validate?]
-	if (CheckForMultiGameAndRegion(CurDICMD, &ISOShift, &BI2region) != 0)
-	{
-		ShowMessageScreenAndExit("CheckForMultiGameAndRegion() failed.", 1);
+	int ret = CheckForMultiGameAndRegion(CurDICMD, &ISOShift, &BI2region);
+	if (ret != 0) {
+		ClearScreen();
+		PrintInfo();
+		PrintFormat(DEFAULT_SIZE, MAROON, MENU_POS_X, MENU_POS_Y + 20*4, "CheckForMultiGameAndRegion() failed: %d", ret);
+		switch (ret) {
+			case 1:
+				PrintFormat(DEFAULT_SIZE, MAROON, MENU_POS_X, MENU_POS_Y + 20*5, "Unable to open the %s.",
+					CurDICMD == 0 ? "disc image file" : "disc drive");
+				break;
+			case 2:
+				PrintFormat(DEFAULT_SIZE, MAROON, MENU_POS_X, MENU_POS_Y + 20*5, "Unable to read the disc header.");
+				break;
+			case 3:
+				PrintFormat(DEFAULT_SIZE, MAROON, MENU_POS_X, MENU_POS_Y + 20*5, "Unable to read the CISO bi2.bin area.");
+				break;
+			case 4:
+				PrintFormat(DEFAULT_SIZE, MAROON, MENU_POS_X, MENU_POS_Y + 20*5, "Unable to open the extracted FST bi2.bin file.");
+				break;
+			case 5:
+				PrintFormat(DEFAULT_SIZE, MAROON, MENU_POS_X, MENU_POS_Y + 20*5, "Unable to read the extracted FST bi2.bin file.");
+				break;
+			default:
+				PrintFormat(DEFAULT_SIZE, MAROON, MENU_POS_X, MENU_POS_Y + 20*5, "Unknown error code.");
+				break;
+		}
+
+		if (CurDICMD) {
+			char unkdev[32];
+			const char *device;
+			switch (CurDICMD) {
+				case DIP_CMD_NORMAL:
+					device = "GameCube disc";
+					break;
+				case DIP_CMD_DVDR:
+					device = "DVD-R";
+					break;
+				case DIP_CMD_WIIVC:
+					device = "Wii VC";
+					break;
+				default:
+					snprintf(unkdev, sizeof(unkdev), "Unknown (CMD: 0x%02lX)", CurDICMD);
+					device = unkdev;
+					break;
+			}
+			PrintFormat(DEFAULT_SIZE, MAROON, MENU_POS_X, MENU_POS_Y + 20*7, "Device: %s", device);
+		} else {
+			PrintFormat(DEFAULT_SIZE, MAROON, MENU_POS_X, MENU_POS_Y + 20*7, "Filename: %s:%s", GetRootDevice(), ncfg->GamePath);
+		}
+
+		PrintFormat(DEFAULT_SIZE, MAROON, MENU_POS_X, MENU_POS_Y + 20*20, "Returning to loader in 10 seconds.");
+		UpdateScreen();
+		VIDEO_WaitVSync();
+
+		// Wait 10 seconds...
+		usleep(10000000);
+
+		// Return to the loader.
+		ExitToLoader(1);
 	}
+
+	// Save the ISO shift value for multi-game discs.
 	*(vu32*)0xD300300C = ISOShift;
 
 //Set Language
