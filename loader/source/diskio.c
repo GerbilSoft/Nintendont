@@ -1,6 +1,3 @@
-// FIXME: Preliminary loader diskio.c for Nintendont.
-// Needs cleaning up before committing.
-
 /*-----------------------------------------------------------------------*/
 /* Low level disk I/O module skeleton for FatFs     (C)ChaN, 2016        */
 /*-----------------------------------------------------------------------*/
@@ -21,12 +18,12 @@
 
 extern DISC_INTERFACE __io_wiisd;
 extern DISC_INTERFACE __io_custom_usbstorage;
-DISC_INTERFACE *driver[_VOLUMES] = { &__io_wiisd, &__io_custom_usbstorage };
-static bool disk_isInit[_VOLUMES] = {0};
+DISC_INTERFACE *driver[FF_VOLUMES] = { &__io_wiisd, &__io_custom_usbstorage };
+static bool disk_isInit[FF_VOLUMES] = {0};
 
 // Disk cache.
-unsigned int sectorSize[_VOLUMES] = {0, 0};
-CACHE *cache[_VOLUMES] = {NULL, NULL};
+unsigned int sectorSize[FF_VOLUMES] = {0, 0};
+CACHE *cache[FF_VOLUMES] = {NULL, NULL};
 
 //from usbstorage.c
 extern u32 __sector_size;	// USB sector size. (Not known until device init.)
@@ -36,7 +33,7 @@ extern void USBStorageOGC_Deinitialize();
 /* Get Drive Status                                                      */
 /*-----------------------------------------------------------------------*/
 DSTATUS disk_status (
-	BYTE pdrv		/* Physical drive number to identify the drive */
+	BYTE pdrv		/* Physical drive nmuber to identify the drive */
 )
 {
 	if (pdrv < DEV_SD || pdrv > DEV_USB)
@@ -58,7 +55,7 @@ DSTATUS disk_status (
 /*-----------------------------------------------------------------------*/
 
 DSTATUS disk_initialize (
-	BYTE pdrv				/* Physical drive number to identify the drive */
+	BYTE pdrv				/* Physical drive nmuber to identify the drive */
 )
 {
 	if (pdrv < DEV_SD || pdrv > DEV_USB)
@@ -106,7 +103,7 @@ DSTATUS disk_initialize (
 /*-----------------------------------------------------------------------*/
 
 DRESULT disk_read (
-	BYTE pdrv,		/* Physical drive number to identify the drive */
+	BYTE pdrv,		/* Physical drive nmuber to identify the drive */
 	BYTE *buff,		/* Data buffer to store read data */
 	DWORD sector,	/* Start sector in LBA */
 	UINT count		/* Number of sectors to read */
@@ -136,7 +133,7 @@ DRESULT disk_read (
 /*-----------------------------------------------------------------------*/
 
 DRESULT disk_write (
-	BYTE pdrv,			/* Physical drive number to identify the drive */
+	BYTE pdrv,			/* Physical drive nmuber to identify the drive */
 	const BYTE *buff,	/* Data to be written */
 	DWORD sector,		/* Start sector in LBA */
 	UINT count			/* Number of sectors to write */
@@ -164,7 +161,7 @@ DRESULT disk_write (
 /*-----------------------------------------------------------------------*/
 
 DRESULT disk_ioctl (
-	BYTE pdrv,		/* Physical drive number (0..) */
+	BYTE pdrv,		/* Physical drive nmuber (0..) */
 	BYTE cmd,		/* Control code */
 	void *buff		/* Buffer to send/receive control data */
 )

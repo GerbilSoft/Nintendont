@@ -51,7 +51,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "ff_utf8.h"
 #include "diskio.h"
 // from diskio.c
-extern DISC_INTERFACE *driver[_VOLUMES];
+extern DISC_INTERFACE *driver[FF_VOLUMES];
 
 extern void __exception_setreload(int t);
 extern void __SYS_ReadROM(void *buf,u32 len,u32 offset);

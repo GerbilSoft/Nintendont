@@ -67,6 +67,7 @@ void SetDiskFunctions(DWORD usb);
 
 DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void* buff);
 
+
 /* Disk Status Bits (DSTATUS) */
 
 #define STA_NOINIT		0x01	/* Drive not initialized */
