@@ -87,7 +87,7 @@ extern GRRLIB_ttfFont *myFont;
 extern GRRLIB_texImg *background;
 extern GRRLIB_texImg *screen_buffer;
 
-enum TRIGames
+typedef enum _TRIGames
 {
 	TRI_NONE = 0,
 	TRI_GP1,
@@ -95,14 +95,14 @@ enum TRIGames
 	TRI_AX,
 	TRI_VS4,
 	TRI_SB,
-};
+} TRIGames;
 
-enum ContentType
+typedef enum _ContentType
 {
 	CONTENT_REQUIRED=	(1<< 0),	// not sure
 	CONTENT_SHARED	=	(1<<15),
 	CONTENT_OPTIONAL=	(1<<14),
-};
+} ContentType;
 
 typedef struct
 {

@@ -30,7 +30,7 @@ typedef struct iovec
 	u32   len;
 } ioctlv;
 
-struct ipcmessage
+typedef struct ipcmessage
 {
 	unsigned int command;			// 0
 	unsigned int result;			// 4
@@ -38,28 +38,28 @@ struct ipcmessage
 	{
 		unsigned int fd;			// 8
 	};
-	union 
-	{ 
+	union
+	{
 		struct
 	 	{
 			char *device;			// 12
 			unsigned int mode;		// 16
 			unsigned int resultfd;	// 20
 		} open;
-	
-		struct 
+
+		struct
 		{
 			void *data;
 			unsigned int length;
 		} read, write;
-		
-		struct 
+
+		struct
 	 	{
 			int offset;
 			int origin;
 		} seek;
-		
-		struct 
+
+		struct
 	 	{
 			unsigned int command;
 
@@ -78,7 +78,7 @@ struct ipcmessage
 			struct ioctl_vector *argv;	// 18
 		} ioctlv;
 	};
-} __attribute__((packed)); 
+} __attribute__((packed)) ipcmessage;
 
 #define IOS_OPEN				0x01
 #define IOS_CLOSE				0x02

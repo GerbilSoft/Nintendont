@@ -186,7 +186,7 @@ enum Gameregion
 	REGION_EXPORT,
 };
 
-enum TRIGames
+typedef enum _TRIGames
 {
 	TRI_NONE = 0,
 	TRI_GP1,
@@ -196,7 +196,7 @@ enum TRIGames
 	TRI_VS4,
 	TRI_YAK,
 	TRI_SB,
-};
+} TRIGames;
 
 typedef struct
 {
