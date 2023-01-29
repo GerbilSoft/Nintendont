@@ -32,7 +32,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <unistd.h>
 #include <ogc/lwp_watchdog.h>
 
-#include "ff_utf8.h"
+#include "ff.h"
 #include "md5.h"
 #include "md5_db.h"
 
@@ -298,7 +298,7 @@ static void OpenDiscImage(const gameinfo *gi, MD5VerifyState_t *md5)
 	FIL *const f_gcm = &md5->f_gcm;
 
 	// Open the disc image.
-	if (f_open_char(f_gcm, gi->Path, FA_READ|FA_OPEN_EXISTING) != FR_OK)
+	if (f_open(f_gcm, gi->Path, FA_READ|FA_OPEN_EXISTING) != FR_OK)
 	{
 		// Could not open the disc image.
 		md5->gcm_read_error = true;

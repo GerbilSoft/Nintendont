@@ -4,7 +4,7 @@
 #include "GCNCard.h"
 #include "Config.h"
 #include "debug.h"
-#include "ff_utf8.h"
+#include "ff.h"
 
 // Triforce variables.
 extern vu32 TRIGame;
@@ -141,7 +141,7 @@ int GCNCard_Load(int slot)
 
 	dbgprintf("EXI: Trying to open %s\r\n", ctx->filename);
 	FIL fd;
-	int ret = f_open_char(&fd, ctx->filename, FA_READ|FA_OPEN_EXISTING);
+	int ret = f_open(&fd, ctx->filename, FA_READ|FA_OPEN_EXISTING);
 	if (ret != FR_OK || fd.obj.objsize == 0)
 	{
 #ifdef DEBUG_EXI
@@ -321,7 +321,7 @@ void GCNCard_Save(void)
 			//dbgprintf("EXI: Saving memory card in Slot %c...", (slot+'A'));
 //#endif
 			FIL fd;
-			int ret = f_open_char(&fd, ctx->filename, FA_WRITE|FA_OPEN_EXISTING);
+			int ret = f_open(&fd, ctx->filename, FA_WRITE|FA_OPEN_EXISTING);
 			if (ret == FR_OK)
 			{
 				UINT wrote;

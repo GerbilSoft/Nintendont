@@ -23,7 +23,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "dip.h"
 #include "global.h"
 #include "TRI.h"
-#include "ff_utf8.h"
+#include "ff.h"
 #include "wdvd.h"
 
 static const char CARD_NAME_GP1[] = "/saves/GP1.bin";
@@ -90,7 +90,7 @@ u32 TRISetupGames(char *Path, unsigned int CurDICMD, u32 ISOShift)
 	{
 		char FullPath[260];
 		snprintf(FullPath, sizeof(FullPath), "%s:%s", GetRootDevice(), Path);
-		fres = f_open_char(&f, FullPath, FA_READ|FA_OPEN_EXISTING);
+		fres = f_open(&f, FullPath, FA_READ|FA_OPEN_EXISTING);
 		if (fres == FR_OK)
 		{
 			f_lseek(&f, 0x420+ISOShift);
@@ -101,7 +101,7 @@ u32 TRISetupGames(char *Path, unsigned int CurDICMD, u32 ISOShift)
 		{
 			char FSTPath[260];
 			snprintf(FSTPath, sizeof(FSTPath), "%ssys/main.dol", FullPath);
-			fres = f_open_char(&f, FSTPath, FA_READ|FA_OPEN_EXISTING);
+			fres = f_open(&f, FSTPath, FA_READ|FA_OPEN_EXISTING);
 		}
 
 		if (fres != FR_OK)

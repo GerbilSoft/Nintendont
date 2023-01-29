@@ -31,7 +31,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "global.h"
 #include "exi.h"
 
-#include "ff_utf8.h"
+#include "ff.h"
 
 
 #define MAX_TITLES	740		// That should cover every GC game
@@ -95,7 +95,7 @@ int LoadTitles(void)
 		 launch_dir[0] != 0 ? launch_dir : "/apps/Nintendont/");
 
 	FIL titles_txt;
-	if (f_open_char(&titles_txt, filepath, FA_READ|FA_OPEN_EXISTING) != FR_OK)
+	if (f_open(&titles_txt, filepath, FA_READ|FA_OPEN_EXISTING) != FR_OK)
 		return 0;
 
 	char *cur_title = &__title_list[0][0];

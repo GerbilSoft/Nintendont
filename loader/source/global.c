@@ -32,7 +32,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <stdio.h>
 #include <unistd.h>
 
-#include "ff_utf8.h"
+#include "ff.h"
 #include "diskio.h"
 
 #include "Config.h"
@@ -325,7 +325,7 @@ bool LoadNinCFG(void)
 {
 	bool ConfigLoaded = true;
 	FIL cfg;
-	if (f_open_char(&cfg, "/nincfg.bin", FA_READ|FA_OPEN_EXISTING) != FR_OK)
+	if (f_open(&cfg, "/nincfg.bin", FA_READ|FA_OPEN_EXISTING) != FR_OK)
 		return false;
 
 	// Read the configuration file into memory.
@@ -479,7 +479,7 @@ int CreateNewFile(const char *Path, unsigned int size)
 	FIL f;
 
 	// Check if the file already exists.
-	if (f_open_char(&f, Path, FA_READ|FA_OPEN_EXISTING) == FR_OK)
+	if (f_open(&f, Path, FA_READ|FA_OPEN_EXISTING) == FR_OK)
 	{	//create ONLY new files
 		f_close(&f);
 		return -1;
@@ -494,7 +494,7 @@ int CreateNewFile(const char *Path, unsigned int size)
 	}
 
 	// Create the file.
-	if (f_open_char(&f, Path, FA_WRITE|FA_CREATE_NEW) != FR_OK)
+	if (f_open(&f, Path, FA_WRITE|FA_CREATE_NEW) != FR_OK)
 	{
 		gprintf("Failed to create %s!\r\n", Path);
 		free(buf);

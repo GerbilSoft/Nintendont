@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 #include "global.h"
 #include "exi.h"
-#include "ff_utf8.h"
+#include "ff.h"
 #include "menu.h"
 #include "font.h"
 
@@ -99,7 +99,7 @@ bool GenerateMemCard(const char *MemCard, u32 BI2region)
 		return false;
 
 	FIL f;
-	if (f_open_char(&f, MemCard, FA_WRITE|FA_CREATE_NEW) != FR_OK)
+	if (f_open(&f, MemCard, FA_WRITE|FA_CREATE_NEW) != FR_OK)
 		return false;
 
 	// Get memory to format. (8 block window)

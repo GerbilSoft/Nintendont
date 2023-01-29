@@ -31,7 +31,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "debug.h"
 #include "SRAM.h"
 
-#include "ff_utf8.h"
+#include "ff.h"
 
 #define EXI_IRQ_INSTANT		0		// as soon as possible
 #define EXI_IRQ_DEFAULT		1900	// about 1000 times a second

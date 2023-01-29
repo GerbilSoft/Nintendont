@@ -40,7 +40,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "BT.h"
 #include "usbstorage.h"
 
-#include "ff_utf8.h"
+#include "ff.h"
 static u8 DummyBuffer[0x1000] __attribute__((aligned(32)));
 extern u32 s_cnt;
 
@@ -223,7 +223,7 @@ void DIinit( bool FirstTime )
 				{
 					strcpy(TempDiscName+slash_pos, disc_filenames[i]);
 					FIL ExistsFile;
-					s32 ret = f_open_char(&ExistsFile, TempDiscName, FA_READ);
+					s32 ret = f_open(&ExistsFile, TempDiscName, FA_READ);
 					if (ret == FR_OK)
 					{
 						// Found the other disc image.

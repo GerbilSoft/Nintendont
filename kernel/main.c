@@ -41,7 +41,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "diskio.h"
 #include "usbstorage.h"
 #include "SDI.h"
-#include "ff_utf8.h"
+#include "ff.h"
 
 //#define USE_OSREPORTDM 1
 
@@ -52,8 +52,7 @@ extern u32 s_size;
 extern u32 s_cnt;
 
 static FATFS *fatfs = NULL;
-//this is just a single / as u16, easier to write in hex
-static const WCHAR fatDevName[2] = { 0x002F, 0x0000 };
+static const char fatDevName[2] = "/";
 
 extern u32 SI_IRQ;
 extern bool DI_IRQ, EXI_IRQ;
@@ -188,7 +187,7 @@ int _main( int argc, char *argv[] )
 	BootStatus(5, 0, 0);
 
 	FIL fp;
-	s32 fres = f_open_char(&fp, "/bladie", FA_READ|FA_OPEN_EXISTING);
+	s32 fres = f_open(&fp, "/bladie", FA_READ|FA_OPEN_EXISTING);
 	switch (fres)
 	{
 		case FR_OK:

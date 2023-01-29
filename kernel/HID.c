@@ -26,7 +26,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "HID_controllers.h"
 
 #include <stdlib.h>
-#include "ff_utf8.h"
+#include "ff.h"
 
 #ifndef DEBUG_HID
 #define dbgprintf(...)
@@ -314,13 +314,13 @@ s32 HIDOpen( u32 LoaderRequest )
 					_sprintf(directory, "/controllers/%04X_%04X.ini", DeviceVID, DevicePID);
 					dbgprintf("Preferred controller.ini file: %s\r\n", directory);
 					
-					ret = f_open_char( &f, directory, FA_OPEN_EXISTING|FA_READ);
+					ret = f_open( &f, directory, FA_OPEN_EXISTING|FA_READ);
 					if(ret != FR_OK)
-						ret = f_open_char( &f, "/controller.ini", FA_OPEN_EXISTING|FA_READ);
+						ret = f_open( &f, "/controller.ini", FA_OPEN_EXISTING|FA_READ);
 					else
 						dbgprintf("%s was used\r\n", directory);
 					if(ret != FR_OK)
-						ret = f_open_char(&f, "/controller.ini.ini", FA_OPEN_EXISTING | FA_READ); // too many people don't read the instructions for windows
+						ret = f_open(&f, "/controller.ini.ini", FA_OPEN_EXISTING | FA_READ); // too many people don't read the instructions for windows
 					if(ret != FR_OK)
 						dbgprintf("HID:Failed to open config file:%u\r\n", ret );
 					else

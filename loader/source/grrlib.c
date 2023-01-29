@@ -39,7 +39,7 @@ THE SOFTWARE.
 #include "grrlib.h"
 #include "global.h"
 #include "exi.h"
-#include "ff_utf8.h"
+#include "ff.h"
 
 #define DEFAULT_FIFO_SIZE (256 * 1024) /**< GX fifo buffer size. */
 
@@ -1477,7 +1477,7 @@ int  GRRLIB_LoadFile(const char* filename, unsigned char* *data) {
 	FIL   fd;
 
 	// Open the file
-	if (f_open_char(&fd, filename, FA_READ|FA_OPEN_EXISTING) != FR_OK) {
+	if (f_open(&fd, filename, FA_READ|FA_OPEN_EXISTING) != FR_OK) {
 		return -1;
 	}
 

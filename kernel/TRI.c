@@ -25,7 +25,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "GCAM.h"
 #include "DI.h"
 #include "EXI.h"
-#include "ff_utf8.h"
+#include "ff.h"
 #include "Config.h"
 #include "asm/PADReadGP.h"
 #include "asm/PADReadF.h"
@@ -111,7 +111,7 @@ void TRIBackupSettings()
 		dbgprintf("TRI:Writing Settings\r\n");
 		memcpy(OUR_SETTINGS_LOC, GameSettingsLoc, TRISettingsSize);
 		FIL backup;
-		if(f_open_char(&backup, TRISettingsName, FA_WRITE | FA_CREATE_ALWAYS) == FR_OK)
+		if(f_open(&backup, TRISettingsName, FA_WRITE | FA_CREATE_ALWAYS) == FR_OK)
 		{
 			u32 wrote;
 			f_write(&backup, OUR_SETTINGS_LOC, TRISettingsSize, &wrote);
@@ -127,7 +127,7 @@ void TRIReadSettings()
 	if(TRISettingsName == (char*)0 || TRISettingsSize == 0)
 		return;
 	FIL backup;
-	if (f_open_char(&backup, TRISettingsName, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+	if (f_open(&backup, TRISettingsName, FA_OPEN_EXISTING | FA_READ) == FR_OK)
 	{
 		if(backup.obj.objsize == TRISettingsSize)
 		{

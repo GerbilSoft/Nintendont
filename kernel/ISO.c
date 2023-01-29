@@ -25,7 +25,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "debug.h"
 #include "wdvd.h"
 
-#include "ff_utf8.h"
+#include "ff.h"
 
 extern u32 TRIGame;
 extern u32 DiscRequested;
@@ -269,7 +269,7 @@ bool ISOInit()
 	}
 	else
 	{
-		s32 ret = f_open_char( &GameFile, ConfigGetGamePath(), FA_READ|FA_OPEN_EXISTING );
+		s32 ret = f_open( &GameFile, ConfigGetGamePath(), FA_READ|FA_OPEN_EXISTING );
 		if( ret != FR_OK )
 			return false;
 

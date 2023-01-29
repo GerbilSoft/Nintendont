@@ -16,7 +16,7 @@
 # include <utime.h>
 
 #include "unzip.h"
-#include "ff_utf8.h"
+#include "ff.h"
 #include "global.h"
 
 #define CASESENSITIVITY (0)
@@ -25,7 +25,7 @@
 
 static int mymkdir(const char* dirname)
 {
-    int ret = f_mkdir_char(dirname);
+    int ret = f_mkdir(dirname);
     return (ret == FR_OK || ret == FR_EXIST);
 }
 
@@ -134,7 +134,7 @@ static int do_extract_currentfile(unzFile uf,const int* popt_extract_without_pat
 
         if ((skip==0) && (err==UNZ_OK))
         {
-            res = f_open_char(&f,write_filename,FA_WRITE|FA_CREATE_ALWAYS);
+            res = f_open(&f,write_filename,FA_WRITE|FA_CREATE_ALWAYS);
 
             /* some zipfile don't contain directory alone before file */
             if ((res != FR_OK) && ((*popt_extract_without_path)==0) &&
@@ -144,7 +144,7 @@ static int do_extract_currentfile(unzFile uf,const int* popt_extract_without_pat
                 *(filename_withoutpath-1)='\0';
                 makedir(write_filename);
                 *(filename_withoutpath-1)=c;
-                res = f_open_char(&f,write_filename,FA_WRITE|FA_CREATE_ALWAYS);
+                res = f_open(&f,write_filename,FA_WRITE|FA_CREATE_ALWAYS);
             }
 
             if (res != FR_OK)

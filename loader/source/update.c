@@ -40,7 +40,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "update.h"
 #include "../../common/include/NintendontVersion.h"
 
-#include "ff_utf8.h"
+#include "ff.h"
 #include "unzip/miniunz.h"
 #include "unzip/ioapi.h"
 
@@ -85,11 +85,11 @@ static int UnzipFile(const char *dir, bool useDefaultDrive, DOWNLOADS download_n
 		changeToDefaultDrive();
 	} else {
 		// Use the active drive.
-		f_chdrive_char(UseSD ? "sd:" : "usb:");
+		f_chdrive(UseSD ? "sd:" : "usb:");
 	}
 
-	f_mkdir_char(dir); // attempt to make dir
-	if (f_chdir_char(dir) != FR_OK) {
+	f_mkdir(dir); // attempt to make dir
+	if (f_chdir(dir) != FR_OK) {
 		gprintf("Error changing into %s, aborting\r\n", dir);
 		unzClose(uf);
 		return -2;
@@ -242,8 +242,8 @@ static s32 Download(DOWNLOADS download_number)  {
 	line++;
 	if (!dir_argument_exists) {
 		gprintf("Creating new directory\r\n");
-		f_mkdir_char("/apps");
-		f_mkdir_char("/apps/Nintendont");
+		f_mkdir("/apps");
+		f_mkdir("/apps/Nintendont");
 	}
 
 	// Write the file to disk.
@@ -275,7 +275,7 @@ static s32 Download(DOWNLOADS download_number)  {
 	else
 	{
 		FIL file;
-		FRESULT res = f_open_char(&file, filepath, FA_WRITE|FA_CREATE_ALWAYS);
+		FRESULT res = f_open(&file, filepath, FA_WRITE|FA_CREATE_ALWAYS);
 		if (res != FR_OK) {
 			gprintf("File Error\r\n");
 			snprintf(errmsg, sizeof(errmsg), "Error opening '%s': %u", filepath, res);

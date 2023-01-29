@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include "md5_db.h"
 #include "global.h"
-#include "ff_utf8.h"
+#include "ff.h"
 #include "md5.h"
 
 #include <stdio.h>
@@ -58,7 +58,7 @@ MD5_DB_Status LoadMD5Database(MD5_DB_t *pDB)
 	FIL f_md5;
 	pDB->db = NULL;
 	pDB->size = 0;
-	FRESULT res = f_open_char(&f_md5, filepath, FA_READ|FA_OPEN_EXISTING);
+	FRESULT res = f_open(&f_md5, filepath, FA_READ|FA_OPEN_EXISTING);
 	if (res == FR_OK)
 	{
 		// Load the MD5 database. (Should be 1 MB or less.)

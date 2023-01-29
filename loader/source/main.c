@@ -49,7 +49,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "Config.h"
 #include "wdvd.h"
 
-#include "ff_utf8.h"
+#include "ff.h"
 #include "diskio.h"
 // from diskio.c
 extern DISC_INTERFACE *driver[FF_VOLUMES];
@@ -141,8 +141,8 @@ static void updateMetaXml(void)
 
 	if (!dir_argument_exists) {
 		gprintf("Creating new directory\r\n");
-		f_mkdir_char("/apps");
-		f_mkdir_char("/apps/Nintendont");
+		f_mkdir("/apps");
+		f_mkdir("/apps/Nintendont");
 	}
 
 	char new_meta[1024];
@@ -169,7 +169,7 @@ static void updateMetaXml(void)
 
 	// Check if the file already exists.
 	FIL meta;
-	if (f_open_char(&meta, filepath, FA_READ|FA_OPEN_EXISTING) == FR_OK)
+	if (f_open(&meta, filepath, FA_READ|FA_OPEN_EXISTING) == FR_OK)
 	{
 		// File exists. If it's the same as the new meta.xml,
 		// don't bother rewriting it.
@@ -193,7 +193,7 @@ static void updateMetaXml(void)
 
 	// File does not exist, or file is not identical.
 	// Write the new meta.xml.
-	if (f_open_char(&meta, filepath, FA_WRITE|FA_CREATE_ALWAYS) == FR_OK)
+	if (f_open(&meta, filepath, FA_WRITE|FA_CREATE_ALWAYS) == FR_OK)
 	{
 		// Reserve space in the file.
 		if (f_size(&meta) < len) {
@@ -212,7 +212,7 @@ static const WCHAR *primaryDevice;
 void changeToDefaultDrive()
 {
 	f_chdrive(primaryDevice);
-	f_chdir_char("/");
+	f_chdir("/");
 }
 
 /**
@@ -249,7 +249,7 @@ static u32 CheckForMultiGameAndRegion(unsigned int CurDICMD, u32 *ISOShift, u32 
 		else
 		{
 			snprintf(GamePath, sizeof(GamePath), "%s:%s", GetRootDevice(), ncfg->GamePath);
-			fres = f_open_char(&f, GamePath, FA_READ|FA_OPEN_EXISTING);
+			fres = f_open(&f, GamePath, FA_READ|FA_OPEN_EXISTING);
 			if (fres != FR_OK)
 			{
 				// Error opening the file.
@@ -326,7 +326,7 @@ static u32 CheckForMultiGameAndRegion(unsigned int CurDICMD, u32 *ISOShift, u32 
 
 		// Get the bi2.bin region code.
 		snprintf(GamePath, sizeof(GamePath), "%s:%ssys/bi2.bin", GetRootDevice(), ncfg->GamePath);
-		fres = f_open_char(&f, GamePath, FA_READ|FA_OPEN_EXISTING);
+		fres = f_open(&f, GamePath, FA_READ|FA_OPEN_EXISTING);
 		if (fres != FR_OK)
 		{
 			// Error opening bi2.bin.
@@ -929,7 +929,7 @@ int main(int argc, char **argv)
 
 		// Write config to the boot device, which is loaded on next launch.
 		FIL cfg;
-		if (f_open_char(&cfg, "/nincfg.bin", FA_WRITE|FA_OPEN_ALWAYS) == FR_OK)
+		if (f_open(&cfg, "/nincfg.bin", FA_WRITE|FA_OPEN_ALWAYS) == FR_OK)
 		{
 			// Reserve space in the file.
 			if (f_size(&cfg) < sizeof(NIN_CFG)) {
@@ -945,7 +945,7 @@ int main(int argc, char **argv)
 		// Write config to the game device, used by the Nintendont kernel.
 		char ConfigPath[20];
 		snprintf(ConfigPath, sizeof(ConfigPath), "%s:/nincfg.bin", GetRootDevice());
-		if (f_open_char(&cfg, ConfigPath, FA_WRITE|FA_OPEN_ALWAYS) == FR_OK)
+		if (f_open(&cfg, ConfigPath, FA_WRITE|FA_OPEN_ALWAYS) == FR_OK)
 		{
 			// Reserve space in the file.
 			if (f_size(&cfg) < sizeof(NIN_CFG)) {
@@ -1062,7 +1062,7 @@ int main(int argc, char **argv)
 		// Set up the memory card file.
 		char BasePath[20];
 		snprintf(BasePath, sizeof(BasePath), "%s:/saves", GetRootDevice());
-		f_mkdir_char(BasePath);
+		f_mkdir(BasePath);
 
 		char MemCardName[8];
 		memset(MemCardName, 0, 8);
@@ -1097,7 +1097,7 @@ int main(int argc, char **argv)
 		snprintf(MemCard, sizeof(MemCard), "%s/%s.raw", BasePath, MemCardName);
 		gprintf("Using %s as Memory Card.\r\n", MemCard);
 		FIL f;
-		if (f_open_char(&f, MemCard, FA_READ|FA_OPEN_EXISTING) != FR_OK)
+		if (f_open(&f, MemCard, FA_READ|FA_OPEN_EXISTING) != FR_OK)
 		{
 			// Memory card file not found. Create it.
 			if(GenerateMemCard(MemCard, BI2region) == false)
@@ -1133,7 +1133,7 @@ int main(int argc, char **argv)
 		// Create saves directory.
 		char BasePath[20];
 		snprintf(BasePath, sizeof(BasePath), "%s:/saves", GetRootDevice());
-		f_mkdir_char(BasePath);
+		f_mkdir(BasePath);
 	}
 
 	#define GCN_IPL_SIZE 2097152
@@ -1170,7 +1170,7 @@ int main(int argc, char **argv)
 
 			FIL f;
 			if (iplchar[0] != 0 &&
-			    f_open_char(&f, iplchar, FA_READ|FA_OPEN_EXISTING) == FR_OK)
+			    f_open(&f, iplchar, FA_READ|FA_OPEN_EXISTING) == FR_OK)
 			{
 				if (f.obj.objsize == GCN_IPL_SIZE)
 				{
@@ -1188,7 +1188,7 @@ int main(int argc, char **argv)
 			char iplchar[32];
 			snprintf(iplchar, sizeof(iplchar), "%s:/segaboot.bin", GetRootDevice());
 			FIL f;
-			if (f_open_char(&f, iplchar, FA_READ|FA_OPEN_EXISTING) == FR_OK)
+			if (f_open(&f, iplchar, FA_READ|FA_OPEN_EXISTING) == FR_OK)
 			{
 				if (f.obj.objsize == TRI_IPL_SIZE)
 				{

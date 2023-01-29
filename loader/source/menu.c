@@ -39,7 +39,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include "menu.h"
 #include "../../common/include/CommonConfigStrings.h"
-#include "ff_utf8.h"
+#include "ff.h"
 #include "ShowGameInfo.h"
 
 // Dark gray for grayed-out menu items.
@@ -142,7 +142,7 @@ static bool IsDiscImageValid(const char *filename, int discNumber, gameinfo *gi)
 	u32 BI2region_addr = 0x458;	// BI2 region code address.
 
 	FIL in;
-	if (f_open_char(&in, filename, FA_READ|FA_OPEN_EXISTING) != FR_OK)
+	if (f_open(&in, filename, FA_READ|FA_OPEN_EXISTING) != FR_OK)
 	{
 		// Could not open the disc image.
 		return false;
@@ -331,13 +331,13 @@ static DevState LoadGameList(gameinfo *gi, u32 sz, u32 *pGameCount)
 
 	DIR pdir;
 	snprintf(filename, sizeof(filename), "%s:/games", GetRootDevice());
-	if (f_opendir_char(&pdir, filename) != FR_OK)
+	if (f_opendir(&pdir, filename) != FR_OK)
 	{
 		// Could not open the "games" directory.
 
 		// Attempt to open the device root.
 		snprintf(filename, sizeof(filename), "%s:/", GetRootDevice());
-		if (f_opendir_char(&pdir, filename) != FR_OK)
+		if (f_opendir(&pdir, filename) != FR_OK)
 		{
 			// Could not open the device root.
 			if (pGameCount)
@@ -398,9 +398,8 @@ static DevState LoadGameList(gameinfo *gi, u32 sz, u32 *pGameCount)
 			// Prepare the filename buffer with the directory name.
 			// game.iso/disc2.iso will be appended later.
 			// NOTE: fInfo.fname[] is UTF-16.
-			const char *filename_utf8 = wchar_to_char(fInfo.fname);
 			int fnlen = snprintf(filename, sizeof(filename), "%s:/games/%s/",
-					     GetRootDevice(), filename_utf8);
+					     GetRootDevice(), fInfo.fname);
 
 			//Test if game.iso exists and add to list
 			bool found = false;
@@ -435,7 +434,7 @@ static DevState LoadGameList(gameinfo *gi, u32 sz, u32 *pGameCount)
 			{
 				// Read the disc header from boot.bin.
 				memcpy(&filename[fnlen], "sys/boot.bin", 13);
-				if (f_open_char(&in, filename, FA_READ|FA_OPEN_EXISTING) != FR_OK)
+				if (f_open(&in, filename, FA_READ|FA_OPEN_EXISTING) != FR_OK)
 					continue;
 				//gprintf("(%s) ok\n", filename );
 				UINT read;
@@ -446,7 +445,7 @@ static DevState LoadGameList(gameinfo *gi, u32 sz, u32 *pGameCount)
 
 				// Read the BI2.bin region code.
 				memcpy(&filename[fnlen], "sys/bi2.bin", 12);
-				if (f_open_char(&in, filename, FA_READ|FA_OPEN_EXISTING) != FR_OK)
+				if (f_open(&in, filename, FA_READ|FA_OPEN_EXISTING) != FR_OK)
 					continue;
 				//gprintf("(%s) ok\n", filename );
 				u32 BI2region;
@@ -478,12 +477,11 @@ static DevState LoadGameList(gameinfo *gi, u32 sz, u32 *pGameCount)
 			// Regular file.
 
 			// Make sure its extension is ".iso" or ".gcm".
-			const char *filename_utf8 = wchar_to_char(fInfo.fname);
-			if (IsSupportedFileExt(filename_utf8))
+			if (IsSupportedFileExt(fInfo.fname))
 			{
 				// Create the full pathname.
 				snprintf(filename, sizeof(filename), "%s:/games/%s",
-					 GetRootDevice(), filename_utf8);
+					 GetRootDevice(), fInfo.fname);
 
 				// Attempt to load disc information.
 				// (NOTE: Only disc 1 is supported right now.)

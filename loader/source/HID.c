@@ -2,7 +2,7 @@
 #include <gccore.h>
 #include "exi.h"
 #include "HID.h"
-#include "ff_utf8.h"
+#include "ff.h"
 
 #define HID_STATUS 0xD3003440
 #define HID_CHANGE (HID_STATUS+4)
@@ -38,7 +38,7 @@ void HIDUpdateRegisters()
 	FRESULT res = FR_DISK_ERR;
 	for (i = 0; i < 6; i++)
 	{
-		res = f_open_char(&f, filenames[i], FA_READ|FA_OPEN_EXISTING);
+		res = f_open(&f, filenames[i], FA_READ|FA_OPEN_EXISTING);
 		if (res == FR_OK)
 			break;
 	}
