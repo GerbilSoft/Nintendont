@@ -12,11 +12,11 @@ endif
 
 include $(DEVKITPPC)/wii_rules
 
-CFLAGS	:= -O3 -g -std=gnu89 -Wall $(MACHDEP)
+CFLAGS	:= -O3 -g -std=gnu99 -Wall $(MACHDEP)
 ARFLAGS	:= cru
 
 TARGET	:= libfatfs-ppc.a
-OBJECTS	:= ff-ppc.o ff_utf8-ppc.o option/ccsbcs-ppc.o
+OBJECTS	:= ff-ppc.o ff_utf8-ppc.o ffsystem-ppc.o ffunicode-ppc.o
 
 .PHONY: FORCE
 
@@ -33,4 +33,4 @@ $(TARGET): $(OBJECTS)
 	@$(CC) $(CFLAGS) -c -MMD -MP -MF $(@:.o=.d) -o $@ $<
 
 clean:
-	-$(RM) -f *-ppc.a *-ppc.o *-ppc.d option/*-ppc.o option/*-ppc.d
+	-$(RM) -f *-ppc.a *-ppc.o *-ppc.d

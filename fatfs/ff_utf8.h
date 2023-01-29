@@ -20,20 +20,20 @@ const char *wchar_to_char(const WCHAR *wcs);
 FRESULT f_open_char(FIL* fp, const char* path, BYTE mode);
 FRESULT f_mount_char(FATFS* fs, const char* path, BYTE opt);
 
-#if !_FS_READONLY
+#if !FF_FS_READONLY
 FRESULT f_mkdir_char(const char* path);
-#endif /* !_FS_READONLY */
+#endif /* !FF_FS_READONLY */
 
-#if _FS_RPATH >= 1
-#if _VOLUMES >= 2
+#if FF_FS_RPATH >= 1
+#if FF_VOLUMES >= 2
 FRESULT f_chdrive_char(const char* path);
-#endif /* _VOLUMES >= 2 */
+#endif /* FF_VOLUMES >= 2 */
 FRESULT f_chdir_char(const char* path);
-#endif /* _FS_RPATH >= 1 */
+#endif /* FF_FS_RPATH >= 1 */
 
-#if _FS_MINIMIZE <= 1
+#if FF_FS_MINIMIZE <= 1
 FRESULT f_opendir_char(DIR* dp, const char* path);
-#endif /* _FS_MINIMIZE <= 1 */
+#endif /* FF_FS_MINIMIZE <= 1 */
 
 #ifdef __cplusplus
 }

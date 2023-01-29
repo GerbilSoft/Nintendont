@@ -22,7 +22,7 @@ else
 	ZIP = zip
 endif
 
-CFLAGS	:= -mbig-endian -O3 -std=gnu89 -g -I. -Wall \
+CFLAGS	:= -mbig-endian -O3 -std=gnu99 -g -I. -Wall \
 	   -mcpu=arm926ej-s -msoft-float -mfloat-abi=soft \
 	   -fdata-sections -ffunction-sections -fno-builtin-toupper -fno-builtin-memcpy \
 	   -fno-builtin-memset -fno-builtin-memcmp -fno-builtin-malloc -fno-builtin-free

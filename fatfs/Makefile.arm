@@ -17,7 +17,7 @@ LD	:= $(PREFIX)gcc
 AR	:= $(PREFIX)ar
 STRIP	:= $(PREFIX)strip
 
-CFLAGS	:= -mbig-endian -O3 -std=gnu89 -g -I. -Wall \
+CFLAGS	:= -mbig-endian -O3 -std=gnu99 -g -I. -Wall \
 	   -mcpu=arm926ej-s -msoft-float -mfloat-abi=soft \
 	   -fdata-sections -ffunction-sections -fno-builtin-toupper -fno-builtin-memcpy \
 	   -fno-builtin-memset -fno-builtin-memcmp -fno-builtin-malloc -fno-builtin-free
@@ -25,7 +25,7 @@ CFLAGS	:= -mbig-endian -O3 -std=gnu89 -g -I. -Wall \
 ARFLAGS	:= cru
 
 TARGET	:= libfatfs-arm.a
-OBJECTS	:= ff-arm.o ff_utf8-arm.o option/ccsbcs-arm.o
+OBJECTS	:= ff-arm.o ff_utf8-arm.o ffsystem-arm.o ffunicode-arm.o
 
 .PHONY: FORCE
 
@@ -42,4 +42,4 @@ $(TARGET): $(OBJECTS)
 	@$(CC) $(CFLAGS) -c -MMD -MP -MF $(@:.o=.d) -o $@ $<
 
 clean:
-	-$(RM) -f *-arm.a *-arm.o *-arm.d option/*-arm.o option/*-arm.d
+	-$(RM) -f *-arm.a *-arm.o *-arm.d

@@ -188,7 +188,8 @@ raw_irq_handler_t BeforeIOSReload();
 void AfterIOSReload(raw_irq_handler_t handle, u32 rev);
 
 /** Device mount/unmount. **/
-#include "integer.h"	/* for WCHAR */
+typedef unsigned short WCHAR;
+typedef unsigned char BYTE;
 const WCHAR *MountDevice(BYTE pdrv);
 int UnmountDevice(BYTE pdrv);
 void CloseDevices(void);
