@@ -2,7 +2,7 @@
 /  FatFs Functional Configurations
 /---------------------------------------------------------------------------*/
 
-#define FFCONF_DEF	86606	/* Revision ID */
+#define FFCONF_DEF	80196	/* Revision ID */
 
 /*---------------------------------------------------------------------------/
 / Function Configurations
@@ -274,7 +274,7 @@
 #define FF_FS_NORTC		0
 #define FF_NORTC_MON	1
 #define FF_NORTC_MDAY	1
-#define FF_NORTC_YEAR	2019
+#define FF_NORTC_YEAR	2020
 /* The option FF_FS_NORTC switches timestamp functiton. If the system does not have
 /  any RTC function or valid timestamp is not needed, set FF_FS_NORTC = 1 to disable
 /  the timestamp function. Every object modified by FatFs will have a fixed timestamp

@@ -166,8 +166,8 @@ int main (void)
     f_close(&amp;fdst);
 
     <span class="c">/* Unregister work area prior to discard it */</span>
-    f_mount(0, "0:", 0);
-    f_mount(0, "1:", 0);
+    f_unmount("0:");
+    f_unmount("1:");
 
     return (int)fr;
 }
